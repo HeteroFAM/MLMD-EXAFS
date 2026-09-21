@@ -22,9 +22,12 @@ mace = ["mace-torch"]
 orb = ["orb-models"]
 uma = ["fairchem-core"]
 sevennet = ["sevenn"]
+# MCP server wrapper for MCP-capable orchestrators (Claude Code, Cline, Cursor).
+mcp = ["mcp>=1.0"]    # server supports both the 1.x FastMCP and 2.x MCPServer APIs
 
 [project.scripts]
 mlmd-exafs = "mlmd_exafs.cli:main"
+mlmd-exafs-mcp = "mlmd_exafs.mcp_server:main"
 
 [tool.setuptools]
 packages = ["mlmd_exafs"]

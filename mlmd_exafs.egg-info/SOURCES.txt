@@ -1,3 +1,4 @@
+LICENSE
 README.md
 pyproject.toml
 mlmd_exafs/__init__.py
@@ -5,6 +6,7 @@ mlmd_exafs/analysis.py
 mlmd_exafs/calculators.py
 mlmd_exafs/cli.py
 mlmd_exafs/feff.py
+mlmd_exafs/mcp_server.py
 mlmd_exafs/md.py
 mlmd_exafs/run_feff.py
 mlmd_exafs.egg-info/PKG-INFO

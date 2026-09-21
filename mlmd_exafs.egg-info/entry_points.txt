@@ -1,2 +1,3 @@
 [console_scripts]
 mlmd-exafs = mlmd_exafs.cli:main
+mlmd-exafs-mcp = mlmd_exafs.mcp_server:main

@@ -8,6 +8,9 @@ chgnet
 [mace]
 mace-torch
 
+[mcp]
+mcp>=1.0
+
 [orb]
 orb-models
 

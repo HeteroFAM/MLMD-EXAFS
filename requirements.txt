@@ -1,0 +1,15 @@
+# Core dependencies (always required)
+ase>=3.22
+numpy
+matplotlib
+
+# MLIP backend — install AT LEAST ONE as the MD force engine.
+# Uncomment the one(s) you need:
+# chgnet
+# mace-torch
+# orb-models
+# fairchem-core
+# sevenn
+
+# FEFF9 is a separate binary (not a Python package). Install it independently
+# and point `mlmd-exafs run-feff --feff-bin` at the executable.

@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mlmd-exafs"
+version = "0.1.0"
+description = "MLIP molecular dynamics + FEFF EXAFS simulation workflow"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = [
+    "ase>=3.22",
+    "numpy",
+    "matplotlib",
+]
+
+[project.optional-dependencies]
+# Install the MLIP backend(s) you intend to use as the MD force engine.
+chgnet = ["chgnet"]
+mace = ["mace-torch"]
+orb = ["orb-models"]
+uma = ["fairchem-core"]
+sevennet = ["sevenn"]
+
+[project.scripts]
+mlmd-exafs = "mlmd_exafs.cli:main"
+
+[tool.setuptools]
+packages = ["mlmd_exafs"]

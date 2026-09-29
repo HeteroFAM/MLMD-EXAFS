@@ -44,6 +44,7 @@ from .calculators import build_calculator
 from .cleanup_exafs import cleanup_exafs
 from .feff import generate_feff_inputs_from_trajectory
 from .fitting_E0 import fit_e0
+from .lcf import run_lcf
 from .md import relax, run_md
 from .run_feff import DEFAULT_FEFF_BIN, run_feff_batch
 
@@ -275,7 +276,8 @@ def mlmd_fit_e0(
 ) -> dict:
     """Fit the E0 shift aligning simulated chi(k) with an experimental spectrum.
 
-    Shifts the simulated k grid (k'^2 = k^2 + E0/3.81) and minimizes the mean
+    Shifts the simulated k grid (k'^2 = k^2 + E0/3.81, Artemis/IFEFFIT sign
+    convention) and minimizes the mean
     squared k^2*chi deviation from experiment over [kmin, kmax]. Writes the
     shifted spectrum, a comparison table, a summary and calc_vs_exp.png.
 
@@ -298,6 +300,61 @@ def mlmd_fit_e0(
         exp_col2_is_k2chi=exp_col2_is_k2chi,
         e0_min=e0_min,
         e0_max=e0_max,
+    )
+    result["status"] = "success"
+    return result
+
+
+@mcp.tool()
+def mlmd_lcf(
+    exp_file: str,
+    standards: list[str],
+    outdir: str = "lcf_fit",
+    metric: str = "redchi",
+    max_components: int = 3,
+    kmin: Optional[float] = None,
+    kmax: Optional[float] = None,
+    k_weight: int = 2,
+    e0_min: float = -20.0,
+    e0_max: float = 20.0,
+    e0_sign: float = -1.0,
+    scale_for_shift: bool = True,
+) -> dict:
+    """Linear combination fit of several simulated chi(k) spectra to experiment.
+
+    First fits an individual delta E0 for every simulated standard, then fits
+    non-negative weights summing to 1 for every combination of up to
+    ``max_components`` standards, ranking combinations by ``metric``. Writes
+    lcf_results.csv, delta_e0.csv, best_lcf_fit.dat and best_lcf_fit.png.
+
+    Args:
+        exp_file: Experimental chi(k) file (.dat or .csv).
+        standards: Simulated chi(k) files or glob patterns (e.g. "*-chi_avg.dat").
+        outdir: Output directory.
+        metric: redchi, chi2, rmsd, or rfactor.
+        max_components: Maximum standards combined in one fit.
+        kmin: Fit kmin in A^-1 (full experimental range if omitted).
+        kmax: Fit kmax in A^-1 (full experimental range if omitted).
+        k_weight: k-weight applied during E0 search and LCF.
+        e0_min: Delta E0 search minimum in eV.
+        e0_max: Delta E0 search maximum in eV.
+        e0_sign: E0 sign convention; -1 (default) is Artemis/IFEFFIT, same as
+            ``mlmd_fit_e0``. +1 flips the sign of reported delta E0.
+        scale_for_shift: Optimize a temporary amplitude during each E0 search.
+    """
+    result = run_lcf(
+        exp_file=exp_file,
+        standards=standards,
+        outdir=outdir,
+        metric=metric,
+        max_components=max_components,
+        kmin=kmin,
+        kmax=kmax,
+        k_weight=k_weight,
+        e0_min=e0_min,
+        e0_max=e0_max,
+        e0_sign=e0_sign,
+        scale_for_shift=scale_for_shift,
     )
     result["status"] = "success"
     return result

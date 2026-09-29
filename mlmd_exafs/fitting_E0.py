@@ -6,6 +6,8 @@ The simulated averaged chi(k) (``<savefile>-chi_avg.dat`` from
 :func:`mlmd_exafs.analysis.average_chi`) is shifted in energy,
 k'^2 = k^2 + E0 / K2EV, and E0 is chosen to minimize the mean squared
 deviation of k^2*chi against the experimental spectrum over [kmin, kmax].
+This is the Artemis/IFEFFIT E0 convention (a positive E0 moves the theory
+edge up in energy), shared with :mod:`mlmd_exafs.lcf`.
 
 Experimental data may be whitespace-delimited (``.dat``) or comma-separated
 (``.csv``); the first two numeric columns are read as k and chi (or k^2*chi).

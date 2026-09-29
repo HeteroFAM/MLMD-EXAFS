@@ -67,6 +67,7 @@ string (not a loaded array).
 | `mlmd_cleanup` | Delete FEFF scratch files in `exafs_*` dirs | `root`, `dry_run` |
 | `mlmd_average_chi` | Average χ(k) (+ E0 fit if `exp_file`) | `directory`, `savefile`, `exp_file` |
 | `mlmd_fit_e0` | Fit E0 shift vs. experiment (`.dat`/`.csv`) | `chi_file`, `exp_file`, `kmin`, `kmax` |
+| `mlmd_lcf` | Linear combination fit of several simulated spectra to experiment | `exp_file`, `standards`, `max_components`, `metric` |
 | `mlmd_plot` | k-weighted χ(k) + band | `chi_file`, `k_weight`, `band` |
 | `mlmd_convergence` | k-/R-space convergence panels | `directory`, `step` |
 
@@ -92,6 +93,9 @@ The orchestrator will, in order:
 5. `mlmd_average_chi(directory="…", exp_file="…")` → averaged χ(k), plus the
    fitted E0 shift when an experimental spectrum is provided.
 6. `mlmd_plot(chi_file="…")` and `mlmd_convergence(directory="…")` → figures.
+7. Optionally, with several candidate structures computed:
+   `mlmd_lcf(exp_file="…", standards=["…/*-chi_avg.dat"])` → best weighted
+   mix of candidates.
 
 ## Notes
 

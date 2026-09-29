@@ -211,7 +211,8 @@ The same fit is available on its own for an existing averaged file:
 mlmd-exafs fit-e0 --chi-file exafs-chi_avg.dat --exp-file exp_k.dat
 ```
 
-The simulated k grid is shifted, k'² = k² + E0/3.81, and E0 is chosen to
+The simulated k grid is shifted, k'² = k² + E0/3.81 (Artemis/IFEFFIT sign
+convention: positive E0 moves the theory edge up in energy), and E0 is chosen to
 minimize the mean squared deviation of k²χ(k) from experiment over
 [`--fit-kmin`, `--fit-kmax`] (grid search over [`--e0-min`, `--e0-max`] =
 [-10, 10] eV, then golden-section refinement).
@@ -262,6 +263,58 @@ the curves stop changing as more snapshots are added.
 
 ---
 
+## Step 7 — Linear combination fitting (optional)
+
+When several candidate structures could be present in the sample (different
+adsorption sites, protonation states, substitution sites, ...), run Steps 1–5
+for each candidate and fit the experimental spectrum as a weighted mix of
+their averaged spectra:
+
+```bash
+mlmd-exafs lcf \
+    --exp-file goethite_pt_exp_k.dat \
+    --standards "sims/*-chi_avg.dat" \
+    --kmin 2.5 --kmax 14 \
+    --max-components 3 \
+    --metric redchi \
+    -o lcf_fit
+```
+
+The fit has two steps:
+
+1. **Per-standard ΔE0.** Each simulated spectrum ("standard") is shifted in
+   energy against experiment, k_query² = k_exp² + `e0_sign`·0.262468·ΔE0,
+   and ΔE0 is chosen within [`--e0-min`, `--e0-max`] = [-20, 20] eV to
+   minimize the metric on k²-weighted χ(k). By default a temporary amplitude
+   is fitted during this search so spectral shape drives the shift
+   (`--no-scale-for-shift` to disable).
+2. **Combinations.** Every combination of 1 to `--max-components` standards
+   is fitted with its ΔE0 values fixed. Weights are ≥ 0 and sum to 1 (a single
+   standard has weight 1). The combinations are then ranked by `--metric`.
+
+| Option | Default | Notes |
+|--------|---------|-------|
+| `--standards` | required | Files and/or glob patterns (`.dat` or `.csv`; columns k, χ) |
+| `--metric` | `redchi` | `redchi`, `chi2`, `rmsd`, or `rfactor`. `redchi` counts n ΔE0 + (n−1) weights as parameters, penalizing larger combinations |
+| `--kmin`/`--kmax` | full range | Experimental k range used in the fit |
+| `--k-weight` | 2 | k-weight used for the ΔE0 search and LCF |
+| `--e0-sign` | −1 | −1 = Artemis/IFEFFIT, same ΔE0 as `fit-e0`. +1 flips every ΔE0 sign (weights unchanged) |
+| `--min-valid-frac` | 0.95 | Shifted standards must cover this fraction of experimental points |
+
+Outputs in `lcf_fit/`:
+
+- `lcf_results.csv` — every combination, ranked, with all metrics, weights
+  and ΔE0 values.
+- `delta_e0.csv` — ΔE0 and single-standard score for each standard.
+- `best_lcf_fit.dat` — k, experimental/fitted/residual χ and k²χ for the
+  best combination.
+- `best_lcf_fit.png` — experiment vs. best LCF (k²χ).
+
+The number of combinations grows quickly: 13 standards with
+`--max-components 3` means 377 fits.
+
+---
+
 ## Interpreting the result
 
 - **k-space (k²χ(k))** — the raw oscillations. A noisy high-k region signals
@@ -294,6 +347,7 @@ from mlmd_exafs.run_feff import run_feff_batch
 from mlmd_exafs.analysis import average_chi, plot_chi, plot_convergence
 from mlmd_exafs.cleanup_exafs import cleanup_exafs
 from mlmd_exafs.fitting_E0 import fit_e0
+from mlmd_exafs.lcf import run_lcf
 
 calc = build_calculator("chgnet", device="cpu")
 
@@ -314,6 +368,11 @@ avg = average_chi(gen["output_dir"], savefile="exafs")
 # optional, when an experimental spectrum (.dat or .csv) is available
 fit = fit_e0(avg["output_file"], "exp_k.csv", outdir="exafs_E0_fit")
 print(fit["best_E0"])
+
+# optional: linear combination fit of several candidates' averaged spectra
+lcf = run_lcf("exp_k.dat", "sims/*-chi_avg.dat", outdir="lcf_fit",
+              kmin=2.5, kmax=14, max_components=3)
+print(lcf["best"]["standards"], lcf["best"]["weights"])
 plot_chi(avg["output_file"], "exafs_k2", k_weight=2, band="sem",
          n_samples=avg["n_samples"])
 plot_convergence(gen["output_dir"], "exafs_convergence")

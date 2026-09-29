@@ -9,6 +9,7 @@ Subcommands, in pipeline order::
     mlmd-exafs cleanup     # remove FEFF scratch files from exafs_* dirs
     mlmd-exafs average     # average chi.dat -> chi_avg.dat (+ E0 fit if --exp-file)
     mlmd-exafs fit-e0      # fit E0 shift of chi_avg.dat against experiment
+    mlmd-exafs lcf         # linear combination fit of several spectra to experiment
     mlmd-exafs plot        # k-weighted chi(k) with sampling band
     mlmd-exafs convergence # k- and R-space convergence panels
 
@@ -191,6 +192,28 @@ def _cmd_fit_e0(args):
     print(json.dumps(result, indent=2))
 
 
+def _cmd_lcf(args):
+    from .lcf import run_lcf
+
+    result = run_lcf(
+        exp_file=args.exp_file,
+        standards=args.standards,
+        outdir=args.outdir,
+        metric=args.metric,
+        max_components=args.max_components,
+        kmin=args.kmin,
+        kmax=args.kmax,
+        k_weight=args.k_weight,
+        e0_min=args.e0_min,
+        e0_max=args.e0_max,
+        e0_sign=args.e0_sign,
+        scale_for_shift=not args.no_scale_for_shift,
+        min_valid_frac=args.min_valid_frac,
+        n_top=args.n_top,
+    )
+    print(json.dumps(result, indent=2))
+
+
 def _cmd_plot(args):
     from .analysis import plot_chi
 
@@ -323,6 +346,60 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_e0_fit_args(p)
     p.set_defaults(func=_cmd_fit_e0)
+
+    # lcf
+    from .lcf import METRIC_ALIASES
+
+    p = sub.add_parser(
+        "lcf", help="Linear combination fit of simulated spectra to experiment."
+    )
+    p.add_argument(
+        "--exp-file", required=True, help="Experimental chi(k) file (.dat or .csv)."
+    )
+    p.add_argument(
+        "--standards",
+        nargs="+",
+        required=True,
+        help='Simulated chi(k) files or glob patterns, e.g. "sims/*-chi_avg.dat".',
+    )
+    p.add_argument("-o", "--outdir", default="lcf_fit", help="Output directory.")
+    p.add_argument(
+        "--metric",
+        default="redchi",
+        choices=sorted(METRIC_ALIASES),
+        help="Optimization/ranking metric.",
+    )
+    p.add_argument(
+        "--max-components", type=int, default=3, help="Max standards per combination."
+    )
+    p.add_argument("--kmin", type=float, default=None, help="Fit kmin (A^-1).")
+    p.add_argument("--kmax", type=float, default=None, help="Fit kmax (A^-1).")
+    p.add_argument("--k-weight", type=int, default=2, help="k-weight exponent.")
+    p.add_argument("--e0-min", type=float, default=-20.0, help="Delta E0 search min (eV).")
+    p.add_argument("--e0-max", type=float, default=20.0, help="Delta E0 search max (eV).")
+    p.add_argument(
+        "--e0-sign",
+        type=float,
+        default=-1.0,
+        choices=[1.0, -1.0],
+        help=(
+            "E0 sign convention: k_query^2 = k^2 + sign*0.2625*dE0. "
+            "-1 (default) = Artemis/IFEFFIT, same as fit-e0."
+        ),
+    )
+    p.add_argument(
+        "--no-scale-for-shift",
+        action="store_true",
+        help="Do not optimize a temporary amplitude during each E0 search.",
+    )
+    p.add_argument(
+        "--min-valid-frac",
+        type=float,
+        default=0.95,
+        help="Min fraction of experimental points a shifted standard must cover.",
+    )
+    p.add_argument("--n-top", type=int, default=10, help="Top fits in JSON output.")
+    p.set_defaults(func=_cmd_lcf)
 
     # plot
     p = sub.add_parser("plot", help="Plot k-weighted chi(k) with sampling band.")

@@ -2,6 +2,7 @@
 ase>=3.22
 numpy
 matplotlib
+scipy
 
 # MLIP backend — install AT LEAST ONE as the MD force engine.
 # Uncomment the one(s) you need:

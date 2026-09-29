@@ -5,7 +5,7 @@ tools that a host chat orchestrator can call during a session. Each pipeline
 stage is one tool; together they cover:
 
     relax -> md -> feff-input -> run-feff (+ cleanup) -> average (+ E0 fit)
-    -> plot / convergence
+    -> plot / convergence, and LCF of several simulated spectra to experiment
 
 Contract (matches the host's custom-tool convention):
 
@@ -34,6 +34,7 @@ from mlmd_exafs.calculators import BACKENDS, build_calculator
 from mlmd_exafs.cleanup_exafs import cleanup_exafs
 from mlmd_exafs.feff import generate_feff_inputs_from_trajectory
 from mlmd_exafs.fitting_E0 import fit_e0
+from mlmd_exafs.lcf import run_lcf
 from mlmd_exafs.md import relax, run_md
 from mlmd_exafs.run_feff import DEFAULT_FEFF_BIN, run_feff_batch
 
@@ -222,6 +223,40 @@ def mlmd_fit_e0(
         exp_col2_is_k2chi=exp_col2_is_k2chi,
         e0_min=e0_min,
         e0_max=e0_max,
+    )
+    result["status"] = "success"
+    return result
+
+
+def mlmd_lcf(
+    exp_file: str,
+    standards: list[str],
+    output_dir: str,
+    savefile: str = "lcf_fit",
+    metric: str = "redchi",
+    max_components: int = 3,
+    kmin: float | None = None,
+    kmax: float | None = None,
+    k_weight: int = 2,
+    e0_min: float = -20.0,
+    e0_max: float = 20.0,
+    e0_sign: float = -1.0,
+    scale_for_shift: bool = True,
+) -> dict:
+    """Linear combination fit of several simulated chi(k) spectra to experiment."""
+    result = run_lcf(
+        exp_file=exp_file,
+        standards=standards,
+        outdir=str(Path(output_dir) / savefile),
+        metric=metric,
+        max_components=max_components,
+        kmin=kmin,
+        kmax=kmax,
+        k_weight=k_weight,
+        e0_min=e0_min,
+        e0_max=e0_max,
+        e0_sign=e0_sign,
+        scale_for_shift=scale_for_shift,
     )
     result["status"] = "success"
     return result
@@ -451,6 +486,43 @@ tool_schemas = [
     {
         "type": "function",
         "function": {
+            "name": "mlmd_lcf",
+            "description": (
+                "Linear combination fit (LCF) of several simulated chi(k) "
+                "spectra (e.g. averaged spectra of candidate structures) to an "
+                "experimental spectrum (.dat or .csv). Fits an individual delta "
+                "E0 per standard, then non-negative weights summing to 1 for "
+                "every combination of up to max_components standards, ranked "
+                "by metric. Writes lcf_results.csv, delta_e0.csv, "
+                "best_lcf_fit.dat and best_lcf_fit.png."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "exp_file": {"type": "string", "description": "Experimental chi(k) file (.dat or .csv)."},
+                    "standards": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Simulated chi(k) files or glob patterns, e.g. ['sims/*-chi_avg.dat'].",
+                    },
+                    "savefile": {"type": "string", "description": "Output subdirectory name (default 'lcf_fit')."},
+                    "metric": {"type": "string", "enum": ["redchi", "chi2", "rmsd", "rfactor"]},
+                    "max_components": {"type": "integer", "description": "Max standards per combination (default 3)."},
+                    "kmin": {"type": "number", "description": "Fit kmin in A^-1 (default: full range)."},
+                    "kmax": {"type": "number", "description": "Fit kmax in A^-1 (default: full range)."},
+                    "k_weight": {"type": "integer", "description": "k-weight exponent (default 2)."},
+                    "e0_min": {"type": "number", "description": "Delta E0 search min in eV (default -20)."},
+                    "e0_max": {"type": "number", "description": "Delta E0 search max in eV (default 20)."},
+                    "e0_sign": {"type": "number", "enum": [1, -1], "description": "E0 sign convention (default -1 = Artemis/IFEFFIT, same as mlmd_fit_e0)."},
+                    "scale_for_shift": {"type": "boolean", "description": "Optimize a temporary amplitude during each E0 search (default true)."},
+                },
+                "required": ["exp_file", "standards"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "mlmd_plot",
             "description": (
                 "Plot k-weighted chi(k) from an averaged chi file, with the MD "
@@ -546,6 +618,14 @@ def create_tool_functions(data_path: str, output_dir: str) -> dict:
             chi_file, exp_file, output_dir, savefile=savefile,
             exp_col2_is_k2chi=exp_col2_is_k2chi, kmin=kmin, kmax=kmax,
             e0_min=e0_min, e0_max=e0_max,
+        ),
+        "mlmd_lcf": lambda exp_file, standards, savefile="lcf_fit", metric="redchi",
+        max_components=3, kmin=None, kmax=None, k_weight=2, e0_min=-20.0,
+        e0_max=20.0, e0_sign=-1.0, scale_for_shift=True: mlmd_lcf(
+            exp_file, standards, output_dir, savefile=savefile, metric=metric,
+            max_components=max_components, kmin=kmin, kmax=kmax, k_weight=k_weight,
+            e0_min=e0_min, e0_max=e0_max, e0_sign=e0_sign,
+            scale_for_shift=scale_for_shift,
         ),
         "mlmd_plot": lambda chi_file, savefile="exafs_k2", k_weight=2, band="sem",
         n_samples=None: mlmd_plot(

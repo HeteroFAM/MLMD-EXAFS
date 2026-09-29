@@ -10,6 +10,8 @@ The pipeline:
 cell relaxation → NVT molecular dynamics → FEFF input generation
    → batch FEFF (+ scratch cleanup) → configurational averaging of χ(k)
    (+ E0 fit to experiment) → k-/R-space plotting
+
+optional: linear combination fit of several simulated χ(k) to experiment
 ```
 
 Each MD snapshot is turned into a FEFF calculation; averaging the per-snapshot
@@ -71,6 +73,11 @@ mlmd-exafs average -d md_out/relaxed/exafs_Zn_hole1_de_0.0_s02_1.0_rc_6.0 \
     --savefile exafs --exp-file exp_k.dat    # .dat or .csv; omit if none
 mlmd-exafs plot --chi-file exafs-chi_avg.dat --savefile exafs_k2 --k-weight 2
 mlmd-exafs convergence -d md_out/relaxed/exafs_Zn_hole1_de_0.0_s02_1.0_rc_6.0
+
+# 6. (Optional) linear combination fit of several candidate structures'
+#    averaged spectra to experiment
+mlmd-exafs lcf --exp-file exp_k.dat --standards "sims/*-chi_avg.dat" \
+    --kmin 2.5 --kmax 14 --max-components 3
 ```
 
 See **[TUTORIAL.md](TUTORIAL.md)** for a full walkthrough with parameter
@@ -109,8 +116,8 @@ pip install -e ".[mcp]"    # installs the mcp SDK (works with mcp 1.x and 2.x)
 ```
 
 The server (`mlmd_exafs/mcp_server.py`, entry point `mlmd-exafs-mcp`) exposes
-nine tools — `mlmd_relax`, `mlmd_md`, `mlmd_feff_input`, `mlmd_run_feff`,
-`mlmd_cleanup`, `mlmd_average_chi`, `mlmd_fit_e0`, `mlmd_plot`,
+ten tools — `mlmd_relax`, `mlmd_md`, `mlmd_feff_input`, `mlmd_run_feff`,
+`mlmd_cleanup`, `mlmd_average_chi`, `mlmd_fit_e0`, `mlmd_lcf`, `mlmd_plot`,
 `mlmd_convergence` — matching the CLI stages.
 
 ### 3. SciLink plug-in custom tool
@@ -122,7 +129,7 @@ follows SciLink's `tool_schemas` + `create_tool_functions` contract:
 scilink simulate --tools MLMD-EXAFS/tool/mlmd_exafs_tool.py
 ```
 
-It surfaces the same nine stages as SciLink custom tools, wired to the
+It surfaces the same ten stages as SciLink custom tools, wired to the
 session's active structure file and results directory. See
 [tool/README.md](tool/README.md) for details.
 
@@ -140,6 +147,7 @@ session's active structure file and results directory. See
 | `mlmd_exafs/cleanup_exafs.py` | FEFF scratch-file cleanup of `exafs_*` dirs (`cleanup_exafs`) |
 | `mlmd_exafs/analysis.py` | `average_chi`, `xftf`, `plot_chi`, `plot_convergence` |
 | `mlmd_exafs/fitting_E0.py` | E0 shift fit against experimental χ(k), `.dat`/`.csv` (`fit_e0`) |
+| `mlmd_exafs/lcf.py` | Linear combination fit of several simulated χ(k) to experiment (`run_lcf`) |
 | `mlmd_exafs/cli.py` | `mlmd-exafs` command-line entry point |
 | `mlmd_exafs/mcp_server.py` | MCP server (`mlmd-exafs-mcp`) for MCP-capable agents |
 | `tool/mlmd_exafs_tool.py` | SciLink plug-in custom tool |

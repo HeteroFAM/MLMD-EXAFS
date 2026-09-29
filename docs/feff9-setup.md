@@ -1,4 +1,4 @@
-# Guide: Obtaining, Licensing, and Compiling FEFF9
+# Obtaining, Licensing, and Compiling FEFF9
 
 This guide is based on the [*FEFF9.6 User's Guide* (version 9.6.4, updated February 2, 2013)](https://feff.phys.washington.edu/feff/Docs/feff9/feff90/feff90_users_guide.pdf). Some details may have changed since then; check the [FEFF Project website](https://feff.phys.washington.edu/) for current information.
 

@@ -61,9 +61,9 @@ $$\chi(k) = \sum_\Gamma \chi_\Gamma(k)$$
 | $R_\Gamma = R_{0,\Gamma} + \Delta R_\Gamma$ | Half-path length (starting value + fitted shift) | Modeled / fitted |
 | $E_0$ | Aligns the theory energy grid with the data | Fitted |
 
-*Adapted from Table 11.1 of Ravel, et al.*
+*Adapted from Table 11.1 of [Ravel (2016)](https://tsapps.nist.gov/publication/get_pdf.cfm?pub_id=915832).*
 
-> Notation note: Factor conventions differ between references. The FEFF User's Guide, for example, writes the prefactor as $N F_{\text{eff}}/(kR^2)$ and the loss term as $\exp(-2r/\lambda)$. The physics is the same; the factors are absorbed into how each quantity is defined.
+> *Notation note:* Factor conventions differ between references. The FEFF User's Guide, for example, writes the prefactor as $N F_{\text{eff}}/(kR^2)$ and the loss term as $\exp(-2r/\lambda)$. The physics is the same; the factors are absorbed into how each quantity is defined.
 
 What the equation explains:
 - Oscillations come from the sine term, which depends on distance R.
@@ -278,7 +278,7 @@ $$k^n\chi_{fit}(k) = \sum_{j \in \text{combo}} w_j\, k^n\chi_j(k_q^{(j)}), \qqua
 - A single standard has $w = 1$, so only its ΔE₀ was fitted.
 - For two or more standards, the weights are found by constrained minimization of the metric (SLSQP, starting from equal weights).
 
-Because FEFF's χ(k) is normalized per absorbing atom, and the weights sum to 1, each $w_j$ can be read as the *fraction of absorbers in environment j*.
+Because FEFF's χ(k) is normalized per absorbing atom, and the weights sum to 1, each $w_j$ can be read as the fraction of absorbers in environment j.
 
 All combinations are ranked by the chosen metric. With M standards the number of fits is $\sum_{n=1}^{\text{max}} \binom{M}{n}$. For example, 13 standards and up to 3 components give 377 fits.
 

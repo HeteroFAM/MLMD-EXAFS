@@ -8,11 +8,15 @@
 #     set DIRS=`find md_out/mystruct/exafs_Zn_hole1_de_0.0_s02_1.0_rc_6.0/* -type d`
 #     source scripts/run_feff.csh
 #
-# Runs at most $max_num_processes FEFF jobs concurrently.
+# Runs at most $max_num_processes FEFF jobs concurrently. When all jobs finish,
+# FEFF scratch files are removed from the parent exafs_* directory with
+# `mlmd-exafs cleanup` (keeps feff.inp, feff.out, chi.dat); set CLEANUP=0 to
+# skip.
 
 set FEFF_BIN=/share/feff/feff90_binaries/feff.x
 set max_num_processes=32
 set num_processes=0
+if ( ! $?CLEANUP ) set CLEANUP=1
 
 foreach dir (${DIRS})
    cd $dir
@@ -27,3 +31,7 @@ foreach dir (${DIRS})
 end
 
 wait
+
+if ( $CLEANUP == 1 ) then
+   mlmd-exafs cleanup $DIRS[1]:h
+endif

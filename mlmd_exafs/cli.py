@@ -5,8 +5,10 @@ Subcommands, in pipeline order::
     mlmd-exafs relax       # MLIP cell + position relaxation
     mlmd-exafs md          # NVT molecular dynamics -> trajectory
     mlmd-exafs feff-input  # carve snapshots -> feff.inp files
-    mlmd-exafs run-feff    # batch FEFF execution
-    mlmd-exafs average     # average chi.dat -> chi_avg.dat
+    mlmd-exafs run-feff    # batch FEFF execution (+ scratch-file cleanup)
+    mlmd-exafs cleanup     # remove FEFF scratch files from exafs_* dirs
+    mlmd-exafs average     # average chi.dat -> chi_avg.dat (+ E0 fit if --exp-file)
+    mlmd-exafs fit-e0      # fit E0 shift of chi_avg.dat against experiment
     mlmd-exafs plot        # k-weighted chi(k) with sampling band
     mlmd-exafs convergence # k- and R-space convergence panels
 
@@ -17,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 
 from .calculators import BACKENDS
@@ -44,6 +47,51 @@ def _add_backend_args(p: argparse.ArgumentParser) -> None:
         default="mpa",
         choices=["mpa", "omat24"],
         help="ORB / SevenNet dataset modality.",
+    )
+
+
+def _add_e0_fit_args(p: argparse.ArgumentParser) -> None:
+    from .fitting_E0 import (
+        DEFAULT_KMAX,
+        DEFAULT_KMIN,
+        E0_GRID_N_DEFAULT,
+        E0_MAX_DEFAULT,
+        E0_MIN_DEFAULT,
+        K2EV_DEFAULT,
+    )
+
+    g = p.add_argument_group("E0 fitting")
+    g.add_argument(
+        "--fit-kmin", type=float, default=DEFAULT_KMIN, help="E0 fit kmin (A^-1)."
+    )
+    g.add_argument(
+        "--fit-kmax", type=float, default=DEFAULT_KMAX, help="E0 fit kmax (A^-1)."
+    )
+    g.add_argument(
+        "--exp-col2-is-k2chi",
+        action="store_true",
+        help="Experimental column 2 is already k^2*chi (default: chi).",
+    )
+    g.add_argument("--e0-min", type=float, default=E0_MIN_DEFAULT, help="E0 search min (eV).")
+    g.add_argument("--e0-max", type=float, default=E0_MAX_DEFAULT, help="E0 search max (eV).")
+    g.add_argument("--e0-grid-n", type=int, default=E0_GRID_N_DEFAULT, help="E0 grid points.")
+    g.add_argument("--k2ev", type=float, default=K2EV_DEFAULT, help="hbar^2/2m_e (eV A^2).")
+
+
+def _run_e0_fit(args, sim_file: str, outdir: str) -> dict:
+    from .fitting_E0 import fit_e0
+
+    return fit_e0(
+        sim_file=sim_file,
+        exp_file=args.exp_file,
+        outdir=outdir,
+        kmin=args.fit_kmin,
+        kmax=args.fit_kmax,
+        exp_col2_is_k2chi=args.exp_col2_is_k2chi,
+        e0_min=args.e0_min,
+        e0_max=args.e0_max,
+        e0_grid_n=args.e0_grid_n,
+        k2ev=args.k2ev,
     )
 
 
@@ -104,7 +152,22 @@ def _cmd_run_feff(args):
     from .run_feff import run_feff_batch
 
     result = run_feff_batch(
-        args.directory, feff_bin=args.feff_bin, max_workers=args.max_workers
+        args.directory,
+        feff_bin=args.feff_bin,
+        max_workers=args.max_workers,
+        cleanup=not args.no_cleanup,
+    )
+    print(json.dumps(result, indent=2))
+
+
+def _cmd_cleanup(args):
+    from .cleanup_exafs import cleanup_exafs
+
+    result = cleanup_exafs(
+        args.root,
+        keep=args.keep,
+        dry_run=args.dry_run,
+        remove_empty_dirs=args.remove_empty_dirs,
     )
     print(json.dumps(result, indent=2))
 
@@ -116,6 +179,15 @@ def _cmd_average(args):
     result.pop("k", None)
     for key in ("chi_avg", "chi_std", "chi_sem"):
         result.pop(key, None)
+    if args.exp_file and result["n_samples"] > 0:
+        outdir = args.e0_outdir or f"{args.savefile}_E0_fit"
+        result["e0_fit"] = _run_e0_fit(args, result["output_file"], outdir)
+    print(json.dumps(result, indent=2))
+
+
+def _cmd_fit_e0(args):
+    outdir = args.outdir or f"{os.path.splitext(args.chi_file)[0]}_E0_fit"
+    result = _run_e0_fit(args, args.chi_file, outdir)
     print(json.dumps(result, indent=2))
 
 
@@ -197,13 +269,60 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to the FEFF executable.",
     )
     p.add_argument("--max-workers", type=int, default=32, help="Concurrent FEFF jobs.")
+    p.add_argument(
+        "--no-cleanup",
+        action="store_true",
+        help="Keep all FEFF scratch files (default: keep only feff.inp/feff.out/chi.dat).",
+    )
     p.set_defaults(func=_cmd_run_feff)
+
+    # cleanup
+    from .cleanup_exafs import DEFAULT_KEEP
+
+    p = sub.add_parser("cleanup", help="Remove FEFF scratch files from exafs_* dirs.")
+    p.add_argument(
+        "root", nargs="?", default=".", help="Directory to search for exafs_* dirs."
+    )
+    p.add_argument(
+        "--keep",
+        nargs="+",
+        default=sorted(DEFAULT_KEEP),
+        help="Basenames or shell-style patterns to keep.",
+    )
+    p.add_argument("--dry-run", action="store_true", help="Only report deletions.")
+    p.add_argument(
+        "--remove-empty-dirs", action="store_true", help="Also remove emptied dirs."
+    )
+    p.set_defaults(func=_cmd_cleanup)
 
     # average
     p = sub.add_parser("average", help="Average chi.dat files.")
     p.add_argument("-d", "--directory", required=True, help="FEFF output directory.")
     p.add_argument("--savefile", required=True, help="Base path for averaged chi file.")
+    p.add_argument(
+        "--exp-file",
+        default=None,
+        help="Experimental chi(k) (.dat or .csv); if given, fit the E0 shift.",
+    )
+    p.add_argument(
+        "--e0-outdir",
+        default=None,
+        help="E0 fit output dir (default: <savefile>_E0_fit).",
+    )
+    _add_e0_fit_args(p)
     p.set_defaults(func=_cmd_average)
+
+    # fit-e0
+    p = sub.add_parser("fit-e0", help="Fit E0 shift of averaged chi(k) to experiment.")
+    p.add_argument("--chi-file", required=True, help="Averaged *-chi_avg.dat file.")
+    p.add_argument(
+        "--exp-file", required=True, help="Experimental chi(k) file (.dat or .csv)."
+    )
+    p.add_argument(
+        "-o", "--outdir", default=None, help="Output dir (default: <chi-file>_E0_fit)."
+    )
+    _add_e0_fit_args(p)
+    p.set_defaults(func=_cmd_fit_e0)
 
     # plot
     p = sub.add_parser("plot", help="Plot k-weighted chi(k) with sampling band.")

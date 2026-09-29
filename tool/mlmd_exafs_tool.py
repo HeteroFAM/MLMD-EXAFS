@@ -4,7 +4,8 @@ Exposes the MLIP molecular-dynamics + FEFF EXAFS workflow as a set of custom
 tools that a host chat orchestrator can call during a session. Each pipeline
 stage is one tool; together they cover:
 
-    relax -> md -> feff-input -> run-feff -> average -> plot / convergence
+    relax -> md -> feff-input -> run-feff (+ cleanup) -> average (+ E0 fit)
+    -> plot / convergence
 
 Contract (matches the host's custom-tool convention):
 
@@ -30,7 +31,9 @@ from pathlib import Path
 
 from mlmd_exafs.analysis import average_chi, plot_chi, plot_convergence
 from mlmd_exafs.calculators import BACKENDS, build_calculator
+from mlmd_exafs.cleanup_exafs import cleanup_exafs
 from mlmd_exafs.feff import generate_feff_inputs_from_trajectory
+from mlmd_exafs.fitting_E0 import fit_e0
 from mlmd_exafs.md import relax, run_md
 from mlmd_exafs.run_feff import DEFAULT_FEFF_BIN, run_feff_batch
 
@@ -142,25 +145,85 @@ def mlmd_run_feff(
     directory: str,
     feff_bin: str = DEFAULT_FEFF_BIN,
     max_workers: int = 32,
+    cleanup: bool = True,
 ) -> dict:
-    """Batch-execute FEFF in every feff.inp subdirectory of ``directory``."""
-    result = run_feff_batch(directory, feff_bin=feff_bin, max_workers=max_workers)
+    """Batch-execute FEFF in every feff.inp subdirectory, then clean scratch files."""
+    result = run_feff_batch(
+        directory, feff_bin=feff_bin, max_workers=max_workers, cleanup=cleanup
+    )
     result["status"] = "success" if result["n_failed"] == 0 else "partial"
-    result["next_step"] = f"Run mlmd_average_chi with directory='{directory}'."
+    result["next_step"] = (
+        f"Run mlmd_average_chi with directory='{directory}' (pass exp_file if an "
+        "experimental spectrum is available to fit E0)."
+    )
     return result
 
 
-def mlmd_average_chi(directory: str, output_dir: str, savefile: str = "exafs") -> dict:
-    """Average all chi.dat files into a converged chi(k) with a sampling band."""
+def mlmd_cleanup(
+    root: str,
+    dry_run: bool = False,
+    remove_empty_dirs: bool = False,
+) -> dict:
+    """Delete FEFF scratch files from exafs_* directories under ``root``."""
+    result = cleanup_exafs(root, dry_run=dry_run, remove_empty_dirs=remove_empty_dirs)
+    result["status"] = "success" if result["exafs_dirs"] else "no_data"
+    return result
+
+
+def mlmd_average_chi(
+    directory: str,
+    output_dir: str,
+    savefile: str = "exafs",
+    exp_file: str | None = None,
+    exp_col2_is_k2chi: bool = False,
+    kmin: float = 2.0,
+    kmax: float = 12.0,
+) -> dict:
+    """Average all chi.dat files; fit E0 against experiment when exp_file given."""
     base = str(Path(output_dir) / savefile)
     result = average_chi(directory, base)
     # numpy arrays are not JSON-serializable; drop them from the returned dict
     for key in ("k", "chi_avg", "chi_std", "chi_sem"):
         result.pop(key, None)
     result["status"] = "success" if result["n_samples"] > 0 else "no_data"
+    if exp_file and result["n_samples"] > 0:
+        result["e0_fit"] = fit_e0(
+            sim_file=result["output_file"],
+            exp_file=exp_file,
+            outdir=f"{base}_E0_fit",
+            kmin=kmin,
+            kmax=kmax,
+            exp_col2_is_k2chi=exp_col2_is_k2chi,
+        )
     result["next_step"] = (
         f"Run mlmd_plot with chi_file='{result['output_file']}'."
     )
+    return result
+
+
+def mlmd_fit_e0(
+    chi_file: str,
+    exp_file: str,
+    output_dir: str,
+    savefile: str = "exafs_E0_fit",
+    exp_col2_is_k2chi: bool = False,
+    kmin: float = 2.0,
+    kmax: float = 12.0,
+    e0_min: float = -10.0,
+    e0_max: float = 10.0,
+) -> dict:
+    """Fit the E0 shift of averaged simulated chi(k) against experiment."""
+    result = fit_e0(
+        sim_file=chi_file,
+        exp_file=exp_file,
+        outdir=str(Path(output_dir) / savefile),
+        kmin=kmin,
+        kmax=kmax,
+        exp_col2_is_k2chi=exp_col2_is_k2chi,
+        e0_min=e0_min,
+        e0_max=e0_max,
+    )
+    result["status"] = "success"
     return result
 
 
@@ -306,8 +369,30 @@ tool_schemas = [
                     "directory": {"type": "string", "description": "FEFF output dir from mlmd_feff_input."},
                     "feff_bin": {"type": "string", "description": f"Path to FEFF executable (default {DEFAULT_FEFF_BIN})."},
                     "max_workers": {"type": "integer", "description": "Max concurrent FEFF jobs (default 32)."},
+                    "cleanup": {"type": "boolean", "description": "Delete FEFF scratch files afterwards, keeping feff.inp/feff.out/chi.dat (default true)."},
                 },
                 "required": ["directory"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "mlmd_cleanup",
+            "description": (
+                "Delete FEFF scratch files from every exafs_* directory under "
+                "root, keeping only feff.inp, feff.out, chi.dat and "
+                "neighborhoods_*.xyz. mlmd_run_feff already does this by "
+                "default; use for older runs."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "root": {"type": "string", "description": "Directory to search (may itself be an exafs_* dir)."},
+                    "dry_run": {"type": "boolean", "description": "Only report deletions (default false)."},
+                    "remove_empty_dirs": {"type": "boolean", "description": "Also remove emptied directories (default false)."},
+                },
+                "required": ["root"],
             },
         },
     },
@@ -319,15 +404,47 @@ tool_schemas = [
                 "Average all chi.dat files in a FEFF output directory into a "
                 "converged chi(k) spectrum with per-k standard deviation and "
                 "standard error of the mean (MD sampling band). Writes "
-                "<savefile>-chi_avg.dat."
+                "<savefile>-chi_avg.dat. If an experimental spectrum (exp_file) "
+                "is available, also fits the E0 shift against it."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "directory": {"type": "string", "description": "FEFF output directory."},
                     "savefile": {"type": "string", "description": "Base name for the averaged chi file (default 'exafs')."},
+                    "exp_file": {"type": "string", "description": "Optional experimental chi(k) file (.dat or .csv) for E0 fitting."},
+                    "exp_col2_is_k2chi": {"type": "boolean", "description": "Experimental column 2 is already k^2*chi (default false: chi)."},
+                    "kmin": {"type": "number", "description": "E0 fit kmin in A^-1 (default 2.0)."},
+                    "kmax": {"type": "number", "description": "E0 fit kmax in A^-1 (default 12.0)."},
                 },
                 "required": ["directory"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "mlmd_fit_e0",
+            "description": (
+                "Fit the E0 energy shift that best aligns the averaged simulated "
+                "chi(k) with an experimental spectrum (.dat or .csv) by "
+                "minimizing the k^2*chi mean squared deviation over [kmin, kmax]. "
+                "Writes the shifted spectrum, comparison table, summary and "
+                "calc_vs_exp.png."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "chi_file": {"type": "string", "description": "Averaged *-chi_avg.dat file."},
+                    "exp_file": {"type": "string", "description": "Experimental chi(k) file (.dat or .csv)."},
+                    "savefile": {"type": "string", "description": "Output subdirectory name (default 'exafs_E0_fit')."},
+                    "exp_col2_is_k2chi": {"type": "boolean", "description": "Experimental column 2 is already k^2*chi (default false)."},
+                    "kmin": {"type": "number", "description": "Fit kmin in A^-1 (default 2.0)."},
+                    "kmax": {"type": "number", "description": "Fit kmax in A^-1 (default 12.0)."},
+                    "e0_min": {"type": "number", "description": "E0 search min in eV (default -10)."},
+                    "e0_max": {"type": "number", "description": "E0 search max in eV (default 10)."},
+                },
+                "required": ["chi_file", "exp_file"],
             },
         },
     },
@@ -412,9 +529,23 @@ def create_tool_functions(data_path: str, output_dir: str) -> dict:
             sampling_start=sampling_start,
         ),
         "mlmd_run_feff": lambda directory, feff_bin=DEFAULT_FEFF_BIN,
-        max_workers=32: mlmd_run_feff(directory, feff_bin=feff_bin, max_workers=max_workers),
-        "mlmd_average_chi": lambda directory, savefile="exafs": mlmd_average_chi(
-            directory, output_dir, savefile=savefile
+        max_workers=32, cleanup=True: mlmd_run_feff(
+            directory, feff_bin=feff_bin, max_workers=max_workers, cleanup=cleanup,
+        ),
+        "mlmd_cleanup": lambda root, dry_run=False, remove_empty_dirs=False: mlmd_cleanup(
+            root, dry_run=dry_run, remove_empty_dirs=remove_empty_dirs,
+        ),
+        "mlmd_average_chi": lambda directory, savefile="exafs", exp_file=None,
+        exp_col2_is_k2chi=False, kmin=2.0, kmax=12.0: mlmd_average_chi(
+            directory, output_dir, savefile=savefile, exp_file=exp_file,
+            exp_col2_is_k2chi=exp_col2_is_k2chi, kmin=kmin, kmax=kmax,
+        ),
+        "mlmd_fit_e0": lambda chi_file, exp_file, savefile="exafs_E0_fit",
+        exp_col2_is_k2chi=False, kmin=2.0, kmax=12.0, e0_min=-10.0,
+        e0_max=10.0: mlmd_fit_e0(
+            chi_file, exp_file, output_dir, savefile=savefile,
+            exp_col2_is_k2chi=exp_col2_is_k2chi, kmin=kmin, kmax=kmax,
+            e0_min=e0_min, e0_max=e0_max,
         ),
         "mlmd_plot": lambda chi_file, savefile="exafs_k2", k_weight=2, band="sem",
         n_samples=None: mlmd_plot(

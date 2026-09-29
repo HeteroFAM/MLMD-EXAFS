@@ -8,7 +8,8 @@ The pipeline:
 
 ```
 cell relaxation → NVT molecular dynamics → FEFF input generation
-   → batch FEFF → configurational averaging of χ(k) → k-/R-space plotting
+   → batch FEFF (+ scratch cleanup) → configurational averaging of χ(k)
+   (+ E0 fit to experiment) → k-/R-space plotting
 ```
 
 Each MD snapshot is turned into a FEFF calculation; averaging the per-snapshot
@@ -61,12 +62,13 @@ mlmd-exafs md -i relaxed.xyz -d md_out --backend chgnet --temperature 300
 mlmd-exafs feff-input -f md_out/relaxed/relaxed.xyz --target-atom 0 \
     --hole 1 --rmax 6.0
 
-# 4. Run FEFF over all generated inputs
+# 4. Run FEFF over all generated inputs (scratch files are cleaned up after,
+#    keeping feff.inp / feff.out / chi.dat; --no-cleanup to keep everything)
 mlmd-exafs run-feff -d md_out/relaxed/exafs_Zn_hole1_de_0.0_s02_1.0_rc_6.0
 
-# 5. Average χ(k) and plot
+# 5. Average χ(k) (+ fit E0 if an experimental spectrum is available) and plot
 mlmd-exafs average -d md_out/relaxed/exafs_Zn_hole1_de_0.0_s02_1.0_rc_6.0 \
-    --savefile exafs
+    --savefile exafs --exp-file exp_k.dat    # .dat or .csv; omit if none
 mlmd-exafs plot --chi-file exafs-chi_avg.dat --savefile exafs_k2 --k-weight 2
 mlmd-exafs convergence -d md_out/relaxed/exafs_Zn_hole1_de_0.0_s02_1.0_rc_6.0
 ```
@@ -107,8 +109,9 @@ pip install -e ".[mcp]"    # installs the mcp SDK (works with mcp 1.x and 2.x)
 ```
 
 The server (`mlmd_exafs/mcp_server.py`, entry point `mlmd-exafs-mcp`) exposes
-seven tools — `mlmd_relax`, `mlmd_md`, `mlmd_feff_input`, `mlmd_run_feff`,
-`mlmd_average_chi`, `mlmd_plot`, `mlmd_convergence` — matching the CLI stages.
+nine tools — `mlmd_relax`, `mlmd_md`, `mlmd_feff_input`, `mlmd_run_feff`,
+`mlmd_cleanup`, `mlmd_average_chi`, `mlmd_fit_e0`, `mlmd_plot`,
+`mlmd_convergence` — matching the CLI stages.
 
 ### 3. SciLink plug-in custom tool
 
@@ -119,7 +122,7 @@ follows SciLink's `tool_schemas` + `create_tool_functions` contract:
 scilink simulate --tools MLMD-EXAFS/tool/mlmd_exafs_tool.py
 ```
 
-It surfaces the same seven stages as SciLink custom tools, wired to the
+It surfaces the same nine stages as SciLink custom tools, wired to the
 session's active structure file and results directory. See
 [tool/README.md](tool/README.md) for details.
 
@@ -134,7 +137,9 @@ session's active structure file and results directory. See
 | `mlmd_exafs/md.py` | Cell relaxation (`relax`) and NVT MD (`run_md`, `md_engine`) |
 | `mlmd_exafs/feff.py` | `carve_out`, `generate_feff_inputs_from_trajectory` |
 | `mlmd_exafs/run_feff.py` | Batch FEFF execution (`run_feff_batch`) |
+| `mlmd_exafs/cleanup_exafs.py` | FEFF scratch-file cleanup of `exafs_*` dirs (`cleanup_exafs`) |
 | `mlmd_exafs/analysis.py` | `average_chi`, `xftf`, `plot_chi`, `plot_convergence` |
+| `mlmd_exafs/fitting_E0.py` | E0 shift fit against experimental χ(k), `.dat`/`.csv` (`fit_e0`) |
 | `mlmd_exafs/cli.py` | `mlmd-exafs` command-line entry point |
 | `mlmd_exafs/mcp_server.py` | MCP server (`mlmd-exafs-mcp`) for MCP-capable agents |
 | `tool/mlmd_exafs_tool.py` | SciLink plug-in custom tool |

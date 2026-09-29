@@ -63,8 +63,10 @@ string (not a loaded array).
 | `mlmd_relax` | Cell + position relaxation | `backend`, `fmax` |
 | `mlmd_md` | NVT molecular dynamics | `backend`, `temperature`, `n_steps`, `step_size` |
 | `mlmd_feff_input` | Carve snapshots → `feff.inp` | `trajectory_path`, `target_atom`, `hole`, `rmax` |
-| `mlmd_run_feff` | Batch FEFF execution | `directory`, `feff_bin`, `max_workers` |
-| `mlmd_average_chi` | Average χ(k) | `directory`, `savefile` |
+| `mlmd_run_feff` | Batch FEFF execution + scratch cleanup | `directory`, `feff_bin`, `max_workers`, `cleanup` |
+| `mlmd_cleanup` | Delete FEFF scratch files in `exafs_*` dirs | `root`, `dry_run` |
+| `mlmd_average_chi` | Average χ(k) (+ E0 fit if `exp_file`) | `directory`, `savefile`, `exp_file` |
+| `mlmd_fit_e0` | Fit E0 shift vs. experiment (`.dat`/`.csv`) | `chi_file`, `exp_file`, `kmin`, `kmax` |
 | `mlmd_plot` | k-weighted χ(k) + band | `chi_file`, `k_weight`, `band` |
 | `mlmd_convergence` | k-/R-space convergence panels | `directory`, `step` |
 
@@ -85,8 +87,10 @@ The orchestrator will, in order:
 2. `mlmd_md(backend="chgnet", structure_path="…/relaxed.xyz", temperature=300)`
    → writes the trajectory.
 3. `mlmd_feff_input(trajectory_path="…", target_atom=0, hole=1)` → FEFF inputs.
-4. `mlmd_run_feff(directory="…")` → runs FEFF (needs the binary).
-5. `mlmd_average_chi(directory="…")` → averaged χ(k).
+4. `mlmd_run_feff(directory="…")` → runs FEFF (needs the binary), then
+   deletes FEFF scratch files.
+5. `mlmd_average_chi(directory="…", exp_file="…")` → averaged χ(k), plus the
+   fitted E0 shift when an experimental spectrum is provided.
 6. `mlmd_plot(chi_file="…")` and `mlmd_convergence(directory="…")` → figures.
 
 ## Notes

@@ -144,6 +144,21 @@ mlmd-exafs run-feff \
 Each subdirectory gets a `chi.dat` (the EXAFS signal) and a `feff.out` (log).
 `--max-workers` bounds the number of concurrent FEFF jobs.
 
+### Scratch-file cleanup
+
+FEFF leaves many large intermediate files (`phase.bin`, `feff*.dat`, `pot.bin`,
+...) in every snapshot directory. Once all jobs finish, `run-feff` deletes them,
+keeping only `feff.inp`, `feff.out`, `chi.dat` and the `neighborhoods_*.xyz`
+inspection file. Pass `--no-cleanup` to keep everything.
+
+To clean existing runs (or runs made with the csh script) directly:
+
+```bash
+mlmd-exafs cleanup md_out --dry-run            # preview
+mlmd-exafs cleanup md_out                      # every exafs_* dir under md_out
+mlmd-exafs cleanup md_out --keep feff.inp chi.dat "*.xyz" --remove-empty-dirs
+```
+
 ### csh alternative (cluster batch)
 
 If you prefer the classic csh batch loop, use `scripts/run_feff.csh`:
@@ -154,6 +169,8 @@ source scripts/run_feff.csh
 ```
 
 Edit `FEFF_BIN` and `max_num_processes` at the top of the script as needed.
+It runs `mlmd-exafs cleanup` on the parent `exafs_*` directory when done;
+`set CLEANUP=0` before sourcing to skip that.
 
 ---
 
@@ -174,6 +191,39 @@ Writes `exafs-chi_avg.dat` with columns `k  chi_avg  chi_std  chi_sem`:
 - `chi_sem` — standard error of the mean (`chi_std / sqrt(N)`).
 
 Both quantify MD sampling spread, not a force-field error bar.
+
+### E0 shift against experiment (optional)
+
+If you have an experimental spectrum, pass it with `--exp-file` and the E0
+shift is fitted right after averaging:
+
+```bash
+mlmd-exafs average \
+    -d md_out/relaxed/exafs_Zn_hole1_de_0.0_s02_1.0_rc_6.0 \
+    --savefile exafs \
+    --exp-file exp_k.csv \
+    --fit-kmin 2.0 --fit-kmax 12.0
+```
+
+The same fit is available on its own for an existing averaged file:
+
+```bash
+mlmd-exafs fit-e0 --chi-file exafs-chi_avg.dat --exp-file exp_k.dat
+```
+
+The simulated k grid is shifted, k'² = k² + E0/3.81, and E0 is chosen to
+minimize the mean squared deviation of k²χ(k) from experiment over
+[`--fit-kmin`, `--fit-kmax`] (grid search over [`--e0-min`, `--e0-max`] =
+[-10, 10] eV, then golden-section refinement).
+
+- **Experimental file format** — `.dat` (whitespace-delimited) or `.csv`
+  (comma-delimited). The first two numeric columns are read as k (Å⁻¹) and
+  χ(k); header and `#` lines are skipped. Add `--exp-col2-is-k2chi` if
+  column 2 is already k²χ(k).
+- **Output** — `exafs_E0_fit/` (or `--e0-outdir` / `fit-e0 -o`) containing
+  `avg_chi_E0_shifted.dat` (k, χ, k²χ), `best_E0_comparison.dat`,
+  `E0_fit_summary.txt` and `calc_vs_exp.png`. The JSON summary printed by the
+  command includes `best_E0`.
 
 ---
 
@@ -227,7 +277,7 @@ Common issues:
 | Noisy high-k | More MD sampling / longer trajectory |
 | Missing R-space peaks | `--rmax` too small; increase it |
 | Amplitude mismatch | Fit `--s02` against experiment (0.8–1.0) |
-| Peak position shift | SCF convergence or wrong `--corrections`; adjust vrcorr |
+| Peak position shift | Fit E0 (`fit-e0`); SCF convergence or wrong `--corrections`; adjust vrcorr |
 | Non-physical oscillations | MD `--step-size` too large; reduce it |
 
 ---
@@ -242,6 +292,8 @@ from mlmd_exafs.md import relax, run_md
 from mlmd_exafs.feff import generate_feff_inputs_from_trajectory
 from mlmd_exafs.run_feff import run_feff_batch
 from mlmd_exafs.analysis import average_chi, plot_chi, plot_convergence
+from mlmd_exafs.cleanup_exafs import cleanup_exafs
+from mlmd_exafs.fitting_E0 import fit_e0
 
 calc = build_calculator("chgnet", device="cpu")
 
@@ -254,9 +306,14 @@ gen = generate_feff_inputs_from_trajectory(
     sampling_start=1000,
 )
 
+# cleans FEFF scratch files afterwards (cleanup=False to keep them);
+# cleanup_exafs("md_out") does the same for any exafs_* dirs under a root
 run_feff_batch(gen["output_dir"], feff_bin="/share/feff/feff90_binaries/feff.x")
 
 avg = average_chi(gen["output_dir"], savefile="exafs")
+# optional, when an experimental spectrum (.dat or .csv) is available
+fit = fit_e0(avg["output_file"], "exp_k.csv", outdir="exafs_E0_fit")
+print(fit["best_E0"])
 plot_chi(avg["output_file"], "exafs_k2", k_weight=2, band="sem",
          n_samples=avg["n_samples"])
 plot_convergence(gen["output_dir"], "exafs_convergence")

@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Environments
+.venv/
+venv/
+env/
+
+# Local Claude Code settings
+.claude/settings.local.json
+
+# Workflow outputs
+md_out/
+exafs_*/
+*-chi_avg.dat
+*_E0_fit/
+*.traj
+*.log
+*.png

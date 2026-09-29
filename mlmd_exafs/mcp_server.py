@@ -60,6 +60,7 @@ def mlmd_relax(
     model: Optional[str] = None,
     head: str = "omat",
     modal: str = "mpa",
+    checkpoint: Optional[str] = None,
     fmax: float = 0.05,
 ) -> dict:
     """Relax a structure's atomic positions and cell with an MLIP.
@@ -72,12 +73,21 @@ def mlmd_relax(
         output: Path to write the relaxed structure to.
         backend: MLIP backend (chgnet, mace, uma, orb, sevennet).
         device: cpu or cuda.
-        model: Model name/checkpoint (backend default if omitted).
+        model: Pretrained model name (backend default if omitted).
         head: UMA task head (oc20, omat, omol, odac, omc).
         modal: ORB / SevenNet dataset modality (mpa or omat24).
+        checkpoint: Path to a local (e.g. fine-tuned) model checkpoint file,
+            used instead of the pretrained model. Do not also pass model.
         fmax: Force convergence threshold in eV/A.
     """
-    calc = build_calculator(backend, device=device, model=model, head=head, modal=modal)
+    calc = build_calculator(
+        backend,
+        device=device,
+        model=model,
+        head=head,
+        modal=modal,
+        checkpoint=checkpoint,
+    )
     result = relax(structure_path, output, calc, fmax=fmax)
     result["status"] = "success"
     return result
@@ -92,6 +102,7 @@ def mlmd_md(
     model: Optional[str] = None,
     head: str = "omat",
     modal: str = "mpa",
+    checkpoint: Optional[str] = None,
     temperature: float = 300.0,
     step_size: float = 10.0,
     n_steps: int = 11000,
@@ -106,14 +117,22 @@ def mlmd_md(
         directory: Output directory for the trajectory.
         backend: MLIP backend (chgnet, mace, uma, orb, sevennet).
         device: cpu or cuda.
-        model: Model name/checkpoint.
+        model: Pretrained model name.
         head: UMA task head.
         modal: ORB / SevenNet modality.
+        checkpoint: Path to a local (e.g. fine-tuned) model checkpoint file.
         temperature: Temperature in K.
         step_size: MD time step in atomic units (~0.02419 fs each).
         n_steps: Number of MD steps.
     """
-    calc = build_calculator(backend, device=device, model=model, head=head, modal=modal)
+    calc = build_calculator(
+        backend,
+        device=device,
+        model=model,
+        head=head,
+        modal=modal,
+        checkpoint=checkpoint,
+    )
     result = run_md(
         structure_path,
         calc,

@@ -64,12 +64,16 @@ def mlmd_relax(
     model: str | None = None,
     head: str = "omat",
     modal: str = "mpa",
+    checkpoint: str | None = None,
     fmax: float = 0.05,
 ) -> dict:
     """Relax cell + positions with an MLIP; write relaxed.xyz to output_dir."""
     src = _resolve(structure_path, data_path)
     out = str(Path(output_dir) / "relaxed.xyz")
-    calc = build_calculator(backend, device=device, model=model, head=head, modal=modal)
+    calc = build_calculator(
+        backend, device=device, model=model, head=head, modal=modal,
+        checkpoint=checkpoint,
+    )
     result = relax(src, out, calc, fmax=fmax)
     result["status"] = "success"
     result["next_step"] = (
@@ -87,13 +91,17 @@ def mlmd_md(
     model: str | None = None,
     head: str = "omat",
     modal: str = "mpa",
+    checkpoint: str | None = None,
     temperature: float = 300.0,
     step_size: float = 10.0,
     n_steps: int = 11000,
 ) -> dict:
     """Run NVT molecular dynamics; write an extxyz trajectory under output_dir."""
     src = _resolve(structure_path, data_path)
-    calc = build_calculator(backend, device=device, model=model, head=head, modal=modal)
+    calc = build_calculator(
+        backend, device=device, model=model, head=head, modal=modal,
+        checkpoint=checkpoint,
+    )
     result = run_md(
         src,
         calc,
@@ -323,9 +331,13 @@ tool_schemas = [
                         "description": "Structure file; defaults to the active data file.",
                     },
                     "device": {"type": "string", "enum": ["cpu", "cuda"]},
-                    "model": {"type": "string", "description": "Model name (backend default if omitted)."},
+                    "model": {"type": "string", "description": "Pretrained model name (backend default if omitted)."},
                     "head": {"type": "string", "enum": ["oc20", "omat", "omol", "odac", "omc"]},
                     "modal": {"type": "string", "enum": ["mpa", "omat24"]},
+                    "checkpoint": {
+                        "type": "string",
+                        "description": "Path to a local (e.g. fine-tuned) model checkpoint; replaces model.",
+                    },
                     "fmax": {"type": "number", "description": "Force threshold eV/A (default 0.05)."},
                 },
                 "required": ["backend"],
@@ -351,9 +363,13 @@ tool_schemas = [
                         "description": "Relaxed structure file; defaults to the active data file.",
                     },
                     "device": {"type": "string", "enum": ["cpu", "cuda"]},
-                    "model": {"type": "string"},
+                    "model": {"type": "string", "description": "Pretrained model name."},
                     "head": {"type": "string", "enum": ["oc20", "omat", "omol", "odac", "omc"]},
                     "modal": {"type": "string", "enum": ["mpa", "omat24"]},
+                    "checkpoint": {
+                        "type": "string",
+                        "description": "Path to a local (e.g. fine-tuned) model checkpoint; replaces model.",
+                    },
                     "temperature": {"type": "number", "description": "Temperature in K (default 300)."},
                     "step_size": {"type": "number", "description": "MD time step in a.u. (default 10)."},
                     "n_steps": {"type": "integer", "description": "Number of MD steps (default 11000)."},
@@ -582,15 +598,17 @@ def create_tool_functions(data_path: str, output_dir: str) -> dict:
     """
     return {
         "mlmd_relax": lambda backend, structure_path=None, device="cpu", model=None,
-        head="omat", modal="mpa", fmax=0.05: mlmd_relax(
-            data_path, output_dir, backend, structure_path=structure_path,
-            device=device, model=model, head=head, modal=modal, fmax=fmax,
-        ),
-        "mlmd_md": lambda backend, structure_path=None, device="cpu", model=None,
-        head="omat", modal="mpa", temperature=300.0, step_size=10.0,
-        n_steps=11000: mlmd_md(
+        head="omat", modal="mpa", checkpoint=None, fmax=0.05: mlmd_relax(
             data_path, output_dir, backend, structure_path=structure_path,
             device=device, model=model, head=head, modal=modal,
+            checkpoint=checkpoint, fmax=fmax,
+        ),
+        "mlmd_md": lambda backend, structure_path=None, device="cpu", model=None,
+        head="omat", modal="mpa", checkpoint=None, temperature=300.0,
+        step_size=10.0, n_steps=11000: mlmd_md(
+            data_path, output_dir, backend, structure_path=structure_path,
+            device=device, model=model, head=head, modal=modal,
+            checkpoint=checkpoint,
             temperature=temperature, step_size=step_size, n_steps=n_steps,
         ),
         "mlmd_feff_input": lambda trajectory_path, target_atom, hole=1, rmax=6.0,

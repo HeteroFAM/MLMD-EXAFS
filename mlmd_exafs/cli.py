@@ -36,7 +36,14 @@ def _add_backend_args(p: argparse.ArgumentParser) -> None:
     p.add_argument(
         "--device", default="cpu", choices=["cpu", "cuda"], help="Compute device."
     )
-    p.add_argument("--model", default=None, help="Model name/checkpoint (backend default if omitted).")
+    p.add_argument(
+        "--model", default=None, help="Pretrained model name (backend default if omitted)."
+    )
+    p.add_argument(
+        "--checkpoint",
+        default=None,
+        help="Path to a local (e.g. fine-tuned) model checkpoint; replaces --model.",
+    )
     p.add_argument(
         "--head",
         default="omat",
@@ -105,6 +112,7 @@ def _make_calculator(args):
         model=args.model,
         head=args.head,
         modal=args.modal,
+        checkpoint=args.checkpoint,
     )
 
 

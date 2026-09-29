@@ -44,6 +44,10 @@ mlmd-exafs relax \
 - `--fmax` — force convergence threshold in eV/Å (0.05 is a good default; use
   0.02 for tighter geometries).
 - `--device cuda` — use the GPU if available.
+- `--checkpoint <path>` — load a local (e.g. fine-tuned) model file instead of
+  the backend's pretrained model. Use the same `--checkpoint` in Step 2. See
+  the README's "Fine-tuned models" section for the file format each backend
+  expects.
 
 The command prints a JSON summary (convergence flag, step count, final energy,
 initial/final cell parameters). Check that `"converged": true`.

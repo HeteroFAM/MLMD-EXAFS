@@ -33,6 +33,28 @@ for many of the MLIPs conflict, so separate environments are recommended.
 | **ORB** | Fast inference, large/high-throughput systems |
 | **SevenNet** | General materials, scalable |
 
+### Fine-tuned models
+
+`relax` and `md` accept `--checkpoint <path>` (Python/MCP/SciLink: `checkpoint=`)
+to load a local model file, such as a fine-tuned potential, instead of the
+backend's pretrained model. Pass `--checkpoint` or `--model`, not both. The file
+must be in the backend's own format:
+
+| Backend | Checkpoint | Loaded with |
+|---------|------------|-------------|
+| `chgnet` | CHGNet trainer output (`*.pth.tar`) | `CHGNet.from_file` |
+| `mace` | MACE model file (`*.model`) | `mace_mp(model=<path>)` |
+| `uma` | fairchem checkpoint (`*.pt`) | `load_predict_unit` |
+| `orb` | `orb-v3-conservative-inf` state dict (`*.ckpt`, e.g. from `finetune.py`) | `orb_v3_conservative_inf_omat(weights_path=<path>)` |
+| `sevennet` | SevenNet checkpoint (`*.pth`, e.g. `checkpoint_best.pth`) | `SevenNetCalculator(model=<path>)` |
+
+```bash
+mlmd-exafs md -i relaxed.xyz -d md_out --backend mace --checkpoint my_finetuned.model
+```
+
+Use the same checkpoint for `relax` and `md`, so the MD starts from the
+fine-tuned model's equilibrium geometry.
+
 **NOTE:** UMA models are gated. Access can be requested at
 [https://huggingface.co/facebook/UMA](https://huggingface.co/facebook/UMA).
 

@@ -23,19 +23,21 @@ from ase.io import read, write
 # ---------------------------------------------------------------------------
 
 
+def _cell_heights(cell) -> np.ndarray:
+    """Perpendicular distances between opposite faces of the cell."""
+    return 1.0 / np.linalg.norm(cell.reciprocal(), axis=1)
+
+
 def _check_distance(atoms, rmax: float) -> bool:
-    positions = atoms.get_positions()
-    min_distance = np.abs(
-        np.concatenate((positions.min(axis=0), positions.max(axis=0)))
-    ).min()
-    return min_distance > rmax
+    # After wrapping to fractional [-0.5, 0.5), the rmax sphere around the
+    # origin fits inside the cell iff every half-height exceeds rmax.
+    return _cell_heights(atoms.cell).min() / 2 > rmax
 
 
 def _supercell_repeats(atoms, rmax: float) -> list[int]:
-    cell_lengths = np.linalg.norm(atoms.cell.array, axis=1)
     repeats = []
-    for length in cell_lengths:
-        repeat = max(3, int(np.ceil((2 * rmax) / length)))
+    for height in _cell_heights(atoms.cell):
+        repeat = max(3, int(np.floor(2 * rmax / height)) + 1)
         if repeat % 2 == 0:
             repeat += 1
         repeats.append(repeat)

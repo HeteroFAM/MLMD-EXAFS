@@ -1,9 +1,15 @@
 import numpy as np
 import pytest
 from ase import Atoms
+from ase.build import bulk
 from ase.io import read
+from ase.neighborlist import neighbor_list
 
-from mlmd_exafs.feff import carve_out, generate_feff_inputs_from_trajectory
+from mlmd_exafs.feff import (
+    _supercell_repeats,
+    carve_out,
+    generate_feff_inputs_from_trajectory,
+)
 
 
 def _parse_atoms_block(atoms_string):
@@ -35,20 +41,45 @@ def test_carve_out_cluster_geometry(cu_atoms):
     assert lines[1].split() == ["1", "29", "Cu"]
 
 
-@pytest.mark.xfail(
-    raises=ValueError,
-    strict=True,
-    reason=(
-        "Known bug: _supercell_repeats picks n = ceil(2*rmax/L), which only "
-        "guarantees n*L/2 >= rmax. After the absorber is centered, the "
-        "farthest atom plane is ~n*L/2 minus one atom spacing away, so "
-        "_check_distance rejects the supercell (e.g. cubic Cu, a=3.61 A, at "
-        "the default carve radius 6.0 + 2.5 = 8.5 A)."
-    ),
-)
-@pytest.mark.parametrize("rmax", [5.0, 8.5])
-def test_carve_out_supercell_large_enough(cu_atoms, rmax):
-    carve_out(cu_atoms, 0, rmax=rmax)
+def _skewed_cu():
+    atoms = bulk("Cu", "fcc", a=3.61)
+    shear = np.array([[1, 0.1, 0], [0, 1, 0.2], [0.05, 0, 1]])
+    atoms.set_cell(atoms.cell.array @ shear, scale_atoms=True)
+    atoms.rattle(stdev=0.05, seed=1)
+    return atoms
+
+
+STRUCTURES = {
+    "cubic_cu": lambda: bulk("Cu", "fcc", a=3.61, cubic=True),
+    "primitive_cu": lambda: bulk("Cu", "fcc", a=3.61),
+    "hcp_zn": lambda: bulk("Zn", "hcp", a=2.66, c=4.95),
+    "skewed_cu": _skewed_cu,
+}
+
+
+@pytest.mark.parametrize("rmax", [4.0, 5.0, 8.5])
+@pytest.mark.parametrize("name", sorted(STRUCTURES))
+def test_carve_out_matches_neighbor_list(name, rmax):
+    atoms = STRUCTURES[name]()
+    _, atoms_string, _ = carve_out(atoms, 0, rmax=rmax)
+    rows = _parse_atoms_block(atoms_string)
+
+    i, d = neighbor_list("id", atoms, rmax)
+    expected = np.sort(d[i == 0])
+    assert len(rows) - 1 == len(expected)
+    # written coordinates must agree with the NN-DIST column and the reference
+    dists = np.linalg.norm(rows[1:, :3], axis=1)
+    assert np.allclose(dists, rows[1:, 4], atol=1e-5)
+    assert np.allclose(np.sort(dists), expected, atol=1e-5)
+
+
+def test_supercell_repeats_uses_face_height():
+    # Skewing shrinks the face-to-face heights below the vector lengths, so
+    # more repeats are needed than for the orthogonal cell of equal lengths.
+    skewed = Atoms("Cu", cell=[[4, 0, 0], [2.8, 2.8, 0], [0, 0, 4]], pbc=True)
+    orthogonal = Atoms("Cu", cell=np.diag(np.linalg.norm(skewed.cell.array, axis=1)), pbc=True)
+    assert _supercell_repeats(orthogonal, 8.5) == [5, 5, 5]
+    assert _supercell_repeats(skewed, 8.5) == [7, 7, 5]
 
 
 def test_carve_out_excludes_hydrogen():

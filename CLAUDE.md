@@ -53,6 +53,5 @@ The tests run offline, with no MLIP backend and no FEFF9:
 - Synthetic χ(k) comes from `synthetic_chi`, and the FEFF-format writer is `write_feff_chi`. Both are in `tests/conftest.py`.
 - Tests write only inside `tmp_path`. `average_chi` writes relative to the CWD, so its tests use `monkeypatch.chdir`.
 - The MCP import test skips when `mcp` is not installed.
-- `test_carve_out_supercell_large_enough` is a strict `xfail` that documents a known `_supercell_repeats` sizing bug. Remove the mark when the bug is fixed.
 
 A full real run still needs an installed MLIP backend and FEFF9.

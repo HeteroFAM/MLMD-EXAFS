@@ -278,7 +278,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # feff-input
     p = sub.add_parser("feff-input", help="Generate FEFF inputs from a trajectory.")
-    p.add_argument("-f", "--trajectory", required=True, help="MD trajectory (xyz/traj).")
+    p.add_argument("-f", "--trajectory", required=True, help="MD trajectory (traj/extxyz).")
     p.add_argument("-i", "--target-atom", type=int, required=True, help="Absorber index.")
     p.add_argument("--hole", type=int, default=1, help="HOLE: 1=K, 2=L1, 3=L2, 4=L3.")
     p.add_argument("--rmax", type=float, default=6.0, help="FEFF RMAX cutoff (A).")

@@ -96,7 +96,7 @@ def mlmd_md(
     step_size: float = 10.0,
     n_steps: int = 11000,
 ) -> dict:
-    """Run NVT molecular dynamics; write an extxyz trajectory under output_dir."""
+    """Run NVT molecular dynamics; write an ASE .traj trajectory under output_dir."""
     src = _resolve(structure_path, data_path)
     calc = build_calculator(
         backend, device=device, model=model, head=head, modal=modal,
@@ -357,7 +357,7 @@ tool_schemas = [
             "description": (
                 "Run NVT molecular dynamics (Nose-Hoover chain) with an MLIP to "
                 "generate a thermally sampled trajectory for EXAFS. Writes an "
-                "extxyz trajectory. Point structure_path at the relaxed "
+                "ASE .traj trajectory. Point structure_path at the relaxed "
                 "structure from mlmd_relax."
             ),
             "parameters": {
@@ -396,7 +396,7 @@ tool_schemas = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "trajectory_path": {"type": "string", "description": "MD trajectory (extxyz/traj)."},
+                    "trajectory_path": {"type": "string", "description": "MD trajectory (traj/extxyz)."},
                     "target_atom": {"type": "integer", "description": "Index of the absorbing atom."},
                     "hole": {"type": "integer", "description": "HOLE: 1=K, 2=L1, 3=L2, 4=L3 (default 1)."},
                     "rmax": {"type": "number", "description": "FEFF RMAX cutoff in A (default 6.0)."},

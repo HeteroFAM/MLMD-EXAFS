@@ -85,7 +85,7 @@ Examples. CLI, for an L3 edge with a larger path cutoff and a fixed E₀ correct
 
 ```bash
 mlmd-exafs feff-input \
-    -f md_out/relaxed/relaxed.xyz \
+    -f md_out/relaxed/relaxed.traj \
     --target-atom 0 \
     --hole 4 \
     --rmax 8.0 \
@@ -102,7 +102,7 @@ Python:
 from mlmd_exafs.feff import generate_feff_inputs_from_trajectory
 
 gen = generate_feff_inputs_from_trajectory(
-    "md_out/relaxed/relaxed.xyz", target_atom=0, hole=4, rmax=8.0,
+    "md_out/relaxed/relaxed.traj", target_atom=0, hole=4, rmax=8.0,
     scf="5.5 0 30 0.05 10", s02=0.9, corrections="2.0 0.0",
     step_size=100, sampling_start=1000,
 )

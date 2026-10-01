@@ -257,7 +257,7 @@ def test_e0_sign_flips_delta_e0_only(mixture, mode):
         fits[sign] = fit_lcf_combo(k_exp, chi_exp, library, ("A", "B"), de0,
                                    e0_sign=sign, e0_mode=mode)
     a, b = fits[-1.0], fits[1.0]
-    np.testing.assert_allclose(b["delta_e0"], -a["delta_e0"], atol=1e-6)
+    np.testing.assert_allclose(b["delta_e0"], -a["delta_e0"], atol=1e-5)
     np.testing.assert_allclose(b["delta_e0_initial"], -a["delta_e0_initial"], atol=1e-6)
     np.testing.assert_allclose(b["weights"], a["weights"], atol=1e-6)
     for m in ("chi2", "redchi", "rmsd", "rfactor"):

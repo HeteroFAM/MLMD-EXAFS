@@ -86,7 +86,7 @@ The orchestrator will, in order:
 
 1. `mlmd_relax(backend="chgnet")` → writes `relaxed.xyz`.
 2. `mlmd_md(backend="chgnet", structure_path="…/relaxed.xyz", temperature=300)`
-   → writes the trajectory.
+   → writes the trajectory (`relaxed.traj`).
 3. `mlmd_feff_input(trajectory_path="…", target_atom=0, hole=1)` → FEFF inputs.
 4. `mlmd_run_feff(directory="…")` → runs FEFF (needs the binary), then
    deletes FEFF scratch files.

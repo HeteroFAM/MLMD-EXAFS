@@ -75,7 +75,7 @@ def test_relax_and_md(cu_cif, tmp_path, emt_backend, capsys):
         "md", "-i", str(out), "-d", str(tmp_path / "md"), "--backend", "orb",
         "--n-steps", "3",
     ])
-    assert _output(capsys)["trajectory"] == str(tmp_path / "md" / "relaxed" / "relaxed.xyz")
+    assert _output(capsys)["trajectory"] == str(tmp_path / "md" / "relaxed" / "relaxed.traj")
 
 
 def test_feff_input(short_traj, capsys):

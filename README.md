@@ -79,11 +79,11 @@ and point `mlmd-exafs run-feff --feff-bin` at the executable (default path:
 # 1. Relax the cell
 mlmd-exafs relax -i structure.cif -o relaxed.xyz --backend chgnet
 
-# 2. Run NVT MD (writes md_out/relaxed/relaxed.xyz)
+# 2. Run NVT MD (writes md_out/relaxed/relaxed.traj)
 mlmd-exafs md -i relaxed.xyz -d md_out --backend chgnet --temperature 300
 
 # 3. Generate FEFF inputs (Zn K-edge here; --target-atom is the absorber index)
-mlmd-exafs feff-input -f md_out/relaxed/relaxed.xyz --target-atom 0 \
+mlmd-exafs feff-input -f md_out/relaxed/relaxed.traj --target-atom 0 \
     --hole 1 --rmax 6.0
 
 # 4. Run FEFF over all generated inputs (scratch files are cleaned up after,

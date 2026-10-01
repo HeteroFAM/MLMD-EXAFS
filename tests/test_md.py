@@ -21,15 +21,16 @@ def test_relax_with_emt(cu_cif, tmp_path):
     assert len(read(str(out))) == 4
 
 
-def test_run_md_writes_extxyz_and_skips_rerun(cu_cif, tmp_path):
+def test_run_md_writes_traj_and_skips_rerun(cu_cif, tmp_path):
     md_dir = tmp_path / "md_out"
     result = run_md(str(cu_cif), EMT(), str(md_dir), temperature=300, n_steps=5)
 
-    xyz = md_dir / "cu" / "cu.xyz"
-    assert result["trajectory"] == str(xyz)
-    assert xyz.is_file()
-    assert not (md_dir / "cu" / "cu.traj").exists()
-    assert result["n_frames"] == len(read(str(xyz), ":")) >= 5
+    traj = md_dir / "cu" / "cu.traj"
+    assert result["trajectory"] == str(traj)
+    assert traj.is_file()
+    assert not (md_dir / "cu" / "cu.xyz").exists()
+    assert not (md_dir / "cu" / "cu.partial.traj").exists()
+    assert result["n_frames"] == len(read(str(traj), ":")) >= 5
 
     again = run_md(str(cu_cif), EMT(), str(md_dir), n_steps=5)
     assert again["skipped"] is True

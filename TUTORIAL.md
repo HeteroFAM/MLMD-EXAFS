@@ -76,7 +76,7 @@ mlmd-exafs md \
 | `--step-size` | 10 a.u. (≈ 0.24 fs) | Conservative; lower it if MD becomes unstable |
 | `--n-steps` | 11000 (≈ 2.6 ps) | Increase for slow dynamics or better convergence |
 
-Output is written to `md_out/relaxed/relaxed.xyz` (extxyz trajectory) plus a
+Output is written to `md_out/relaxed/relaxed.traj` (ASE trajectory) plus a
 `.log`. If that trajectory already exists the stage is skipped, so re-running is
 safe.
 
@@ -94,7 +94,7 @@ and write a `feff.inp` for it.
 
 ```bash
 mlmd-exafs feff-input \
-    -f md_out/relaxed/relaxed.xyz \
+    -f md_out/relaxed/relaxed.traj \
     --target-atom 0 \
     --hole 1 \
     --rmax 6.0 \

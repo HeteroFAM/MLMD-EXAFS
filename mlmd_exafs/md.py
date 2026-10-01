@@ -116,15 +116,17 @@ def run_md(
     step_size: float = 10.0,
     n_steps: int = 11000,
 ) -> dict:
-    """Run an NVT MD trajectory and write it as an extxyz file.
+    """Run an NVT MD trajectory and keep it as an ASE ``.traj`` file.
 
     Output layout::
 
-        <save_directory>/<structure_stem>/<structure_stem>.xyz   # trajectory
+        <save_directory>/<structure_stem>/<structure_stem>.traj   # trajectory
         <save_directory>/<structure_stem>/<structure_stem>.log    # MD log
 
-    Skips the run (and reports it) if the extxyz trajectory already exists, so
-    the stage is safe to re-invoke.
+    The trajectory is written to ``<structure_stem>.partial.traj`` while MD
+    runs and renamed on completion, so an interrupted run is never mistaken
+    for a finished one. Skips the run (and reports it) if the final trajectory
+    already exists, so the stage is safe to re-invoke.
 
     Returns
     -------
@@ -136,15 +138,16 @@ def run_md(
     save_dir.mkdir(parents=True, exist_ok=True)
 
     traj_path = save_dir / f"{name}.traj"
-    xyz_path = save_dir / f"{name}.xyz"
+    partial_path = save_dir / f"{name}.partial.traj"
     logfile = save_dir / f"{name}.log"
 
-    if xyz_path.exists():
-        print(f"Skipping {name}: trajectory {xyz_path} already exists.")
-        traj = read(str(xyz_path), ":")
-        return {"trajectory": str(xyz_path), "n_frames": len(traj), "skipped": True}
+    if traj_path.exists():
+        print(f"Skipping {name}: trajectory {traj_path} already exists.")
+        with Trajectory(str(traj_path)) as traj:
+            n_frames = len(traj)
+        return {"trajectory": str(traj_path), "n_frames": n_frames, "skipped": True}
 
-    traj_path.unlink(missing_ok=True)
+    partial_path.unlink(missing_ok=True)
     logfile.unlink(missing_ok=True)
 
     atoms = read(input_structure, index=0)
@@ -156,16 +159,14 @@ def run_md(
         temperature=temperature,
         step_size=step_size,
         n_steps=n_steps,
-        traj_file=str(traj_path),
+        traj_file=str(partial_path),
         logfile=str(logfile),
     )
     elapsed = time.time() - start
 
-    traj = Trajectory(str(traj_path))
-    write(str(xyz_path), traj, format="extxyz")
-    n_frames = len(traj)
-    traj.close()
-    traj_path.unlink(missing_ok=True)
+    partial_path.replace(traj_path)
+    with Trajectory(str(traj_path)) as traj:
+        n_frames = len(traj)
 
     # a.u. step -> ps: step_size * 0.02419 fs/step / 1000 fs/ps
     ps_per_frame = step_size * 0.02419 / 1000
@@ -176,7 +177,7 @@ def run_md(
         f"{n_frames} frames, {traj_len_ps:.2f} ps."
     )
     return {
-        "trajectory": str(xyz_path),
+        "trajectory": str(traj_path),
         "n_frames": n_frames,
         "trajectory_length_ps": traj_len_ps,
         "elapsed_s": round(elapsed, 2),

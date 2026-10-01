@@ -109,7 +109,7 @@ def mlmd_md(
 ) -> dict:
     """Run NVT molecular dynamics (Nose-Hoover chain) with an MLIP.
 
-    Generates a thermally sampled extxyz trajectory for EXAFS. Point
+    Generates a thermally sampled ASE .traj trajectory for EXAFS. Point
     ``structure_path`` at the relaxed structure from ``mlmd_relax``.
 
     Args:
@@ -164,7 +164,7 @@ def mlmd_feff_input(
     and writes a ``feff.inp`` per frame. Returns the output directory.
 
     Args:
-        trajectory_path: MD trajectory (extxyz/traj).
+        trajectory_path: MD trajectory (traj/extxyz).
         target_atom: Index of the absorbing atom.
         hole: HOLE card index (1=K, 2=L1, 3=L2, 4=L3).
         rmax: FEFF RMAX path cutoff in A (carve radius is rmax + 2.5 A).

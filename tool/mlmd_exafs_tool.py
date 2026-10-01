@@ -250,6 +250,9 @@ def mlmd_lcf(
     e0_max: float = 20.0,
     e0_sign: float = -1.0,
     scale_for_shift: bool = True,
+    e0_mode: str = "joint",
+    n_starts: int = 5,
+    e0_start_step: float = 2.5,
 ) -> dict:
     """Linear combination fit of several simulated chi(k) spectra to experiment."""
     result = run_lcf(
@@ -265,6 +268,9 @@ def mlmd_lcf(
         e0_max=e0_max,
         e0_sign=e0_sign,
         scale_for_shift=scale_for_shift,
+        e0_mode=e0_mode,
+        n_starts=n_starts,
+        e0_start_step=e0_start_step,
     )
     result["status"] = "success"
     return result
@@ -509,8 +515,9 @@ tool_schemas = [
                 "experimental spectrum (.dat or .csv). Fits an individual delta "
                 "E0 per standard, then non-negative weights summing to 1 for "
                 "every combination of up to max_components standards, ranked "
-                "by metric. Writes lcf_results.csv, delta_e0.csv, "
-                "best_lcf_fit.dat and best_lcf_fit.png."
+                "by metric. By default (e0_mode='joint') each combination's "
+                "delta E0 values are refined together with its weights. Writes lcf_results.csv, delta_e0.csv, "
+                "best_lcf_fit.dat, best_lcf_fit.png, best_lcf_fit_R.png and fit.log."
             ),
             "parameters": {
                 "type": "object",
@@ -527,10 +534,21 @@ tool_schemas = [
                     "kmin": {"type": "number", "description": "Fit kmin in A^-1 (default: full range)."},
                     "kmax": {"type": "number", "description": "Fit kmax in A^-1 (default: full range)."},
                     "k_weight": {"type": "integer", "description": "k-weight exponent (default 2)."},
-                    "e0_min": {"type": "number", "description": "Delta E0 search min in eV (default -20)."},
-                    "e0_max": {"type": "number", "description": "Delta E0 search max in eV (default 20)."},
+                    "e0_min": {"type": "number", "description": "Delta E0 lower bound in eV (default -20)."},
+                    "e0_max": {"type": "number", "description": "Delta E0 upper bound in eV (default 20)."},
                     "e0_sign": {"type": "number", "enum": [1, -1], "description": "E0 sign convention (default -1 = Artemis/IFEFFIT, same as mlmd_fit_e0)."},
                     "scale_for_shift": {"type": "boolean", "description": "Optimize a temporary amplitude during each E0 search (default true)."},
+                    "e0_mode": {
+                        "type": "string",
+                        "enum": ["joint", "joint_shared", "fixed"],
+                        "description": (
+                            "joint (default): one delta E0 per standard refined together with the weights; "
+                            "joint_shared: one delta E0 shared by the combination; "
+                            "fixed: per-standard delta E0 kept fixed (original behavior)."
+                        ),
+                    },
+                    "n_starts": {"type": "integer", "description": "Starting points per joint fit (default 5)."},
+                    "e0_start_step": {"type": "number", "description": "Delta E0 offset in eV between joint-fit starting points (default 2.5)."},
                 },
                 "required": ["exp_file", "standards"],
             },
@@ -639,11 +657,13 @@ def create_tool_functions(data_path: str, output_dir: str) -> dict:
         ),
         "mlmd_lcf": lambda exp_file, standards, savefile="lcf_fit", metric="redchi",
         max_components=3, kmin=None, kmax=None, k_weight=2, e0_min=-20.0,
-        e0_max=20.0, e0_sign=-1.0, scale_for_shift=True: mlmd_lcf(
+        e0_max=20.0, e0_sign=-1.0, scale_for_shift=True, e0_mode="joint", n_starts=5,
+        e0_start_step=2.5: mlmd_lcf(
             exp_file, standards, output_dir, savefile=savefile, metric=metric,
             max_components=max_components, kmin=kmin, kmax=kmax, k_weight=k_weight,
             e0_min=e0_min, e0_max=e0_max, e0_sign=e0_sign,
-            scale_for_shift=scale_for_shift,
+            scale_for_shift=scale_for_shift, e0_mode=e0_mode, n_starts=n_starts,
+            e0_start_step=e0_start_step,
         ),
         "mlmd_plot": lambda chi_file, savefile="exafs_k2", k_weight=2, band="sem",
         n_samples=None: mlmd_plot(

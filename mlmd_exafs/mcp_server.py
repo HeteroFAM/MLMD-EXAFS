@@ -338,13 +338,18 @@ def mlmd_lcf(
     e0_max: float = 20.0,
     e0_sign: float = -1.0,
     scale_for_shift: bool = True,
+    e0_mode: str = "joint",
+    n_starts: int = 5,
+    e0_start_step: float = 2.5,
 ) -> dict:
     """Linear combination fit of several simulated chi(k) spectra to experiment.
 
     First fits an individual delta E0 for every simulated standard, then fits
     non-negative weights summing to 1 for every combination of up to
-    ``max_components`` standards, ranking combinations by ``metric``. Writes
-    lcf_results.csv, delta_e0.csv, best_lcf_fit.dat and best_lcf_fit.png.
+    ``max_components`` standards, ranking combinations by ``metric``. By
+    default (``e0_mode="joint"``) each combination's delta E0 values are
+    refined together with its weights. Writes lcf_results.csv, delta_e0.csv,
+    best_lcf_fit.dat, best_lcf_fit.png, best_lcf_fit_R.png and fit.log.
 
     Args:
         exp_file: Experimental chi(k) file (.dat or .csv).
@@ -355,11 +360,16 @@ def mlmd_lcf(
         kmin: Fit kmin in A^-1 (full experimental range if omitted).
         kmax: Fit kmax in A^-1 (full experimental range if omitted).
         k_weight: k-weight applied during E0 search and LCF.
-        e0_min: Delta E0 search minimum in eV.
-        e0_max: Delta E0 search maximum in eV.
+        e0_min: Delta E0 lower bound in eV.
+        e0_max: Delta E0 upper bound in eV.
         e0_sign: E0 sign convention; -1 (default) is Artemis/IFEFFIT, same as
             ``mlmd_fit_e0``. +1 flips the sign of reported delta E0.
         scale_for_shift: Optimize a temporary amplitude during each E0 search.
+        e0_mode: "joint" (one delta E0 per standard refined with the weights),
+            "joint_shared" (one delta E0 shared by the combination), or
+            "fixed" (per-standard delta E0 kept fixed; original behavior).
+        n_starts: Starting points per joint fit.
+        e0_start_step: Delta E0 offset in eV between joint-fit starting points.
     """
     result = run_lcf(
         exp_file=exp_file,
@@ -374,6 +384,9 @@ def mlmd_lcf(
         e0_max=e0_max,
         e0_sign=e0_sign,
         scale_for_shift=scale_for_shift,
+        e0_mode=e0_mode,
+        n_starts=n_starts,
+        e0_start_step=e0_start_step,
     )
     result["status"] = "success"
     return result

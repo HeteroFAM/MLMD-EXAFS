@@ -218,6 +218,9 @@ def _cmd_lcf(args):
         scale_for_shift=not args.no_scale_for_shift,
         min_valid_frac=args.min_valid_frac,
         n_top=args.n_top,
+        e0_mode=args.e0_mode,
+        n_starts=args.n_starts,
+        e0_start_step=args.e0_start_step,
     )
     print(json.dumps(result, indent=2))
 
@@ -383,8 +386,27 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--kmin", type=float, default=None, help="Fit kmin (A^-1).")
     p.add_argument("--kmax", type=float, default=None, help="Fit kmax (A^-1).")
     p.add_argument("--k-weight", type=int, default=2, help="k-weight exponent.")
-    p.add_argument("--e0-min", type=float, default=-20.0, help="Delta E0 search min (eV).")
-    p.add_argument("--e0-max", type=float, default=20.0, help="Delta E0 search max (eV).")
+    p.add_argument("--e0-min", type=float, default=-20.0, help="Delta E0 bound min (eV).")
+    p.add_argument("--e0-max", type=float, default=20.0, help="Delta E0 bound max (eV).")
+    p.add_argument(
+        "--e0-mode",
+        default="joint",
+        choices=["joint", "joint_shared", "fixed"],
+        help=(
+            "joint: refine one delta E0 per standard together with the weights; "
+            "joint_shared: refine one delta E0 shared by the combination; "
+            "fixed: keep the per-standard delta E0 values fixed."
+        ),
+    )
+    p.add_argument(
+        "--n-starts", type=int, default=5, help="Starting points per joint fit."
+    )
+    p.add_argument(
+        "--e0-start-step",
+        type=float,
+        default=2.5,
+        help="Delta E0 offset (eV) between joint-fit starting points.",
+    )
     p.add_argument(
         "--e0-sign",
         type=float,

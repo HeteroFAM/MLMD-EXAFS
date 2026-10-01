@@ -269,14 +269,23 @@ $$a = \max\!\left(0,\ \frac{\sum_i y_i s_i}{\sum_i s_i^2}\right)$$
 
 Here $y = k^n\chi_{exp}$ and $s = k^n\chi_j(k_q)$. This way the phase of the oscillations, not their amplitude, drives the shift. The amplitude is discarded afterwards.
 
-#### Step 2: weights for every combination
+#### Step 2: weights (and ΔE₀) for every combination
 
-With each ΔE₀ fixed from Step 1, every combination of 1 to `max_components` standards (default 3) is fitted:
+Every combination of 1 to `max_components` standards (default 3) is fitted:
 
 $$k^n\chi_{fit}(k) = \sum_{j \in \text{combo}} w_j\, k^n\chi_j(k_q^{(j)}), \qquad w_j \ge 0,\quad \sum_j w_j = 1$$
 
-- A single standard has $w = 1$, so only its ΔE₀ was fitted.
-- For two or more standards, the weights are found by constrained minimization of the metric (SLSQP, starting from equal weights).
+`e0_mode` sets how ΔE₀ is treated:
+
+- `joint` (default): the n weights and the n ΔE₀ values (one per standard) are refined together by constrained minimization of the metric (SLSQP), with ΔE₀ bounded by $[E_{0,min}, E_{0,max}]$.
+- `joint_shared`: the n weights and one ΔE₀ shared by the whole combination are refined together, like Athena's single E₀ shift.
+- `fixed`: each ΔE₀ is kept at its Step 1 value, and only the weights are fitted (SLSQP, starting from equal weights).
+
+A single standard has $w = 1$, so only its ΔE₀ is fitted. The metric is multimodal in ΔE₀ because of the EXAFS oscillations, so the joint fits are started from the Step 1 ΔE₀ values with the `fixed` weights, and from `n_starts` − 1 further points with every ΔE₀ offset by ±`e0_start_step`, ±2·`e0_start_step`, ... eV (defaults 5 and 2.5 eV). The best result is kept. Because the `fixed` solution is one of the starts, `joint` never fits worse than `fixed` over the same k points.
+
+The metric of one joint fit is always evaluated on the same k points: those where every standard of the combination stays inside its k range at both ΔE₀ bounds. If these cover less than `min_valid_frac` of the data, the points valid at the Step 1 values are used, and each ΔE₀ range is narrowed so that none of those points can leave its standard's k range.
+
+1σ uncertainties of the weights and ΔE₀ values are estimated from the Jacobian $J$ of the k-weighted residual, $\text{cov} = \chi^2_\nu (J^TJ)^{-1}$. They are NaN for weights at 0 or 1 and for ΔE₀ values at a bound. Since no measurement uncertainty ε is used and the points are oversampled, treat them as relative, not absolute, error bars.
 
 Because FEFF's χ(k) is normalized per absorbing atom, and the weights sum to 1, each $w_j$ can be read as the fraction of absorbers in environment j.
 
@@ -289,7 +298,7 @@ No measurement uncertainty ε is available, so all metrics use unweighted residu
 | Metric | Definition |
 |---|---|
 | `chi2` | $\sum_i r_i^2$ |
-| `redchi` (default) | $\chi^2 / (N - N_{par})$, with $N_{par} = n + (n-1)$ for n standards (n ΔE₀ values plus n−1 independent weights) |
+| `redchi` (default) | $\chi^2 / (N - N_{par})$, with $N_{par} = (n-1) + N_{E_0}$ for n standards: n−1 independent weights plus $N_{E_0}$ = n (`joint`), 1 (`joint_shared`) or 0 (`fixed`) ΔE₀ values |
 | `rmsd` | $\sqrt{\frac{1}{N}\sum_i r_i^2}$ |
 | `rfactor` | $\sum_i r_i^2 / \sum_i y_i^2$, the fractional misfit of §7.3 |
 
@@ -299,17 +308,17 @@ No measurement uncertainty ε is available, so all metrics use unweighted residu
 |---|---|---|
 | Free parameters | S₀², E₀, ΔR, σ², N per path (constrained) | One ΔE₀ per standard, plus mixing weights |
 | Disorder (σ²) | Fitted or modeled | Built into each standard by MD averaging |
-| E₀ | Usually one shared E₀ | One ΔE₀ per standard, fitted independently, then fixed |
+| E₀ | Usually one shared E₀ | One ΔE₀ per standard refined with the weights (`joint`), one shared ΔE₀ (`joint_shared`), or per-standard values fixed from Step 1 (`fixed`) |
 | Overall amplitude | S₀² fitted | None. S₀² is whatever was set in each `feff.inp` (`--s02`), and the weights must sum to 1 |
 | χ²_ν denominator | $N_{idp} - N_{var}$ | $N - N_{par}$, with N the number of data points |
-| Error bars | From the covariance matrix | Not reported |
+| Error bars | From the covariance matrix | From $\chi^2_\nu (J^TJ)^{-1}$, without ε |
 
 #### Interpreting LCF results
 
 - *Compare metrics only within one run.* `redchi` is computed on raw, oversampled data points without ε. Its absolute value cannot be compared with χ²_ν from Artemis/IFEFFIT, and it changes with k range and k-weight. Use it only to rank combinations fitted to the same data, over the same k range, with the same k-weight.
 - *The complexity penalty is weak.* Because N (typically a few hundred) is much larger than $N_{par}$, adding a component barely changes the denominator. With N = 210, going from 1 to 3 components changes it from 209 to 205, about 2%. A combination with more standards will therefore usually rank first whenever it lowers χ² at all. Look at how much the metric actually improves. Also check whether the data's information content, $N_{idp} \approx 2\Delta k\Delta R/\pi$ (§7.1), supports that many components. Treat weights close to 0 as absent.
 - *Weights assume matched amplitudes.* There is no free scale factor. If S₀², normalization, or the simulated disorder make the standards too strong or too weak overall, the mismatch shows up in the residual, and it can bias which standards are chosen.
-- *ΔE₀ values are approximate.* Each ΔE₀ is fitted as if that standard alone explained the data, and is not refined jointly with the weights. For a real mixture this is an approximation. Physically, standards for the same absorber should need similar shifts, so widely different ΔE₀ values deserve scrutiny. A ΔE₀ at or near the search bound (e.g. −19.99 eV) almost certainly means a false minimum (§7.5), and that standard does not match the data.
+- *ΔE₀ values need scrutiny.* In `fixed` mode each ΔE₀ is fitted as if that standard alone explained the data, which for a real mixture is an approximation. `joint` removes that approximation, but n free shifts also let standards absorb misfit by sliding in energy. `joint_shared` is the more constrained choice when all standards describe the same absorber. Physically, standards for the same absorber should need similar shifts, so widely different ΔE₀ values deserve scrutiny. A ΔE₀ at or near the search bound (e.g. −19.99 eV) almost certainly means a false minimum (§7.5), and that standard does not match the data.
 - *Uniqueness is not guaranteed.* Standards with similar spectra can trade weight with each other, and fits of similar quality can have very different compositions. Inspect the top-ranked fits in `lcf_results.csv`, not only the best one.
 
 #### Single-standard E₀ alignment (`fit-e0`)
@@ -353,7 +362,7 @@ All standards should be computed with the same FEFF settings. Otherwise differen
 
 - Higher kⁿ emphasizes high-k data, where the spectrum is most sensitive to disorder and to the details of the MD structure.
 - Lower kⁿ emphasizes low-k data, where the spectrum is most sensitive to E₀ and to the choice of potentials.
-- `lcf --k-weight` (default 2) uses one k-weight for both the ΔE₀ search and the weights. Repeat the fit at k-weights 1, 2, and 3, and over slightly different `--kmin`/`--kmax`. A composition that holds up across these is robust; one that changes is not well determined by the data.
+- `lcf --k-weight` (default 2) uses one k-weight for both the ΔE₀ search and the combination fits. Repeat the fit at k-weights 1, 2, and 3, and over slightly different `--kmin`/`--kmax`. A composition that holds up across these is robust; one that changes is not well determined by the data.
 - `fit-e0` always compares k²χ.
 
 ## 9. Common Pitfalls

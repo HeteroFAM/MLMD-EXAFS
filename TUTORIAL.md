@@ -293,13 +293,27 @@ The fit has two steps:
    is fitted during this search so spectral shape drives the shift
    (`--no-scale-for-shift` to disable).
 2. **Combinations.** Every combination of 1 to `--max-components` standards
-   is fitted with its ΔE0 values fixed. Weights are ≥ 0 and sum to 1 (a single
-   standard has weight 1). The combinations are then ranked by `--metric`.
+   is fitted. Weights are ≥ 0 and sum to 1 (a single standard has weight 1).
+   `--e0-mode` controls ΔE0 in this step:
+   - `joint` (default): each standard's ΔE0 is refined together with the
+     weights, starting from its step-1 value.
+   - `joint_shared`: one ΔE0 shared by all standards of the combination is
+     refined together with the weights (Athena's "single E0 shift").
+   - `fixed`: ΔE0 values stay at their step-1 values (the pre-joint behavior).
+
+   Joint fits start from the step-1 ΔE0 values and the `fixed` weights, plus
+   `--n-starts` − 1 further starts with every ΔE0 offset by ±`--e0-start-step`,
+   ±2·`--e0-start-step`, ... eV, and keep the best. The combinations are then
+   ranked by `--metric`.
 
 | Option | Default | Notes |
 |--------|---------|-------|
 | `--standards` | required | Files and/or glob patterns (`.dat` or `.csv`; columns k, χ) |
-| `--metric` | `redchi` | `redchi`, `chi2`, `rmsd`, or `rfactor`. `redchi` counts n ΔE0 + (n−1) weights as parameters, penalizing larger combinations |
+| `--metric` | `redchi` | `redchi`, `chi2`, `rmsd`, or `rfactor`. `redchi` counts (n−1) weights plus n (`joint`), 1 (`joint_shared`) or 0 (`fixed`) ΔE0 values as parameters, penalizing larger combinations |
+| `--e0-mode` | `joint` | `joint`, `joint_shared`, or `fixed` (see above) |
+| `--e0-min`/`--e0-max` | −20 / 20 | ΔE0 bounds (eV) for step 1 and the joint fits |
+| `--n-starts` | 5 | Starting points per joint fit |
+| `--e0-start-step` | 2.5 | ΔE0 offset (eV) between starting points |
 | `--kmin`/`--kmax` | full range | Experimental k range used in the fit |
 | `--k-weight` | 2 | k-weight used for the ΔE0 search and LCF |
 | `--e0-sign` | −1 | −1 = Artemis/IFEFFIT, same ΔE0 as `fit-e0`. +1 flips every ΔE0 sign (weights unchanged) |
@@ -307,12 +321,18 @@ The fit has two steps:
 
 Outputs in `lcf_fit/`:
 
-- `lcf_results.csv` — every combination, ranked, with all metrics, weights
-  and ΔE0 values.
-- `delta_e0.csv` — ΔE0 and single-standard score for each standard.
+- `lcf_results.csv` — every combination, ranked, with all metrics, the
+  parameter count, weights and fitted ΔE0 values (with 1σ uncertainties, NaN
+  when pinned at a bound or not fitted), and the step-1 ΔE0 values.
+- `delta_e0.csv` — step-1 ΔE0 and single-standard score for each standard.
 - `best_lcf_fit.dat` — k, experimental/fitted/residual χ and k²χ for the
-  best combination.
+  best combination, built with its own fitted ΔE0 values. The header records
+  `e0_mode`, weights, fitted and step-1 ΔE0 values.
 - `best_lcf_fit.png` — experiment vs. best LCF (k²χ).
+- `best_lcf_fit_R.png` — the same comparison in R-space (|χ(R)| of the
+  k²-weighted χ(k), Hanning window over the fitted k range).
+- `fit.log` — the progress output printed to the terminal, followed by the
+  returned result as JSON (written even with `verbose=False`).
 
 The number of combinations grows quickly: 13 standards with
 `--max-components 3` means 377 fits.

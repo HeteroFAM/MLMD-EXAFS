@@ -99,7 +99,7 @@ mlmd-exafs convergence -d md_out/relaxed/exafs_Zn_hole1_de_0.0_s02_1.0_rc_6.0
 # 6. (Optional) linear combination fit of several candidate structures'
 #    averaged spectra to experiment
 mlmd-exafs lcf --exp-file exp_k.dat --standards "sims/*-chi_avg.dat" \
-    --kmin 2.5 --kmax 14 --max-components 3
+    --kmin 2.5 --kmax 14 --max-components 3   # --e0-mode joint|joint_shared|fixed
 ```
 
 See **[TUTORIAL.md](TUTORIAL.md)** for a full walkthrough with parameter

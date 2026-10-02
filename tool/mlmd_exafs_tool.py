@@ -129,6 +129,7 @@ def mlmd_feff_input(
     corrections: str | None = None,
     step_size: int = 250,
     sampling_start: int = 0,
+    cluster_buffer: float = 2.5,
 ) -> dict:
     """Carve snapshots and write feff.inp files for sampled trajectory frames."""
     result = generate_feff_inputs_from_trajectory(
@@ -142,6 +143,7 @@ def mlmd_feff_input(
         corrections=corrections,
         step_size=step_size,
         sampling_start=sampling_start,
+        cluster_buffer=cluster_buffer,
     )
     result["status"] = "success"
     result["next_step"] = (
@@ -406,6 +408,7 @@ tool_schemas = [
                     "corrections": {"type": "string", "description": 'CORRECTIONS "vrcorr vicorr", or omit.'},
                     "step_size": {"type": "integer", "description": "Sample every N-th frame (default 250)."},
                     "sampling_start": {"type": "integer", "description": "First frame to sample (default 0)."},
+                    "cluster_buffer": {"type": "number", "description": "Carve radius beyond rmax in A (default 2.5). rmax + cluster_buffer must be >= the SCF radius."},
                 },
                 "required": ["trajectory_path", "target_atom"],
             },
@@ -631,10 +634,10 @@ def create_tool_functions(data_path: str, output_dir: str) -> dict:
         ),
         "mlmd_feff_input": lambda trajectory_path, target_atom, hole=1, rmax=6.0,
         scf="6.0 0 30 0.2 1", s02=1.0, control="1 1 1 1 1 1", corrections=None,
-        step_size=250, sampling_start=0: mlmd_feff_input(
+        step_size=250, sampling_start=0, cluster_buffer=2.5: mlmd_feff_input(
             trajectory_path, target_atom, hole=hole, rmax=rmax, scf=scf, s02=s02,
             control=control, corrections=corrections, step_size=step_size,
-            sampling_start=sampling_start,
+            sampling_start=sampling_start, cluster_buffer=cluster_buffer,
         ),
         "mlmd_run_feff": lambda directory, feff_bin=DEFAULT_FEFF_BIN,
         max_workers=32, cleanup=True: mlmd_run_feff(

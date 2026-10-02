@@ -157,6 +157,7 @@ def mlmd_feff_input(
     corrections: Optional[str] = None,
     step_size: int = 250,
     sampling_start: int = 0,
+    cluster_buffer: float = 2.5,
 ) -> dict:
     """Generate FEFF input files from an MD trajectory.
 
@@ -167,13 +168,16 @@ def mlmd_feff_input(
         trajectory_path: MD trajectory (traj/extxyz).
         target_atom: Index of the absorbing atom.
         hole: HOLE card index (1=K, 2=L1, 3=L2, 4=L3).
-        rmax: FEFF RMAX path cutoff in A (carve radius is rmax + 2.5 A).
+        rmax: FEFF RMAX path cutoff in A (carve radius is rmax + cluster_buffer).
         scf: SCF card parameters.
         s02: S0^2 amplitude reduction factor.
         control: CONTROL card.
         corrections: CORRECTIONS card "vrcorr vicorr", or None to omit.
         step_size: Sample every N-th frame.
         sampling_start: First frame index to sample (skip equilibration).
+        cluster_buffer: Extra carve radius beyond rmax in A (default 2.5).
+            rmax + cluster_buffer must be >= the SCF radius. Use 0 if periodic
+            images of the absorber would enter the cluster.
     """
     result = generate_feff_inputs_from_trajectory(
         trajectory_path=trajectory_path,
@@ -186,6 +190,7 @@ def mlmd_feff_input(
         corrections=corrections,
         step_size=step_size,
         sampling_start=sampling_start,
+        cluster_buffer=cluster_buffer,
     )
     result["status"] = "success"
     return result

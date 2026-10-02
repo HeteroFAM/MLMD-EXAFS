@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 import pytest
 from ase import Atoms
@@ -128,3 +130,28 @@ def test_generate_feff_inputs_with_corrections(short_traj):
     inp = (short_traj.parent / result["output_dir"] / "000000_0" / "feff.inp").read_text()
     assert "CORRECTIONS 2.5 0.0" in inp
     assert "HOLE 4 0.900000" in inp
+
+
+def _max_nn_dist(inp_path):
+    rows = inp_path.read_text().split("ATOMS\n")[1].split("END")[0].splitlines()[1:]
+    return max(float(r.split()[4]) for r in rows if r.strip())
+
+
+@pytest.mark.parametrize("buffer,inside", [(0.0, True), (2.5, False)])
+def test_generate_feff_inputs_cluster_buffer(short_traj, buffer, inside):
+    result = generate_feff_inputs_from_trajectory(
+        str(short_traj), target_atom=0, hole=1, rmax=4.0, scf="4.0 0 30 0.2 1",
+        step_size=10, cluster_buffer=buffer,
+    )
+    max_dist = _max_nn_dist(Path(result["output_dir"]) / "000000_0" / "feff.inp")
+    assert (max_dist <= 4.0) is inside
+    assert max_dist <= 4.0 + buffer
+
+@pytest.mark.parametrize("buffer", [-1.0, 1.0])
+def test_generate_feff_inputs_cluster_buffer_rejected(short_traj, buffer):
+    # rmax 4.0 + 1.0 < default SCF radius 6.0; negative buffer is invalid
+    with pytest.raises(ValueError):
+        generate_feff_inputs_from_trajectory(
+            str(short_traj), target_atom=0, hole=1, rmax=4.0, step_size=10,
+            cluster_buffer=buffer,
+        )

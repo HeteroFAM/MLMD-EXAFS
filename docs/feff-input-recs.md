@@ -78,6 +78,7 @@ The Python keyword, MCP tool argument, and SciLink tool argument all have the sa
 | `PRINT` | `0 0 0 0 0 0` | not available | Python only: `print_flags` |
 | Frame stride | every 250th frame | `--step-size` | `step_size` |
 | First sampled frame | `0` | `--sampling-start` | `sampling_start` |
+| Carve buffer beyond `RMAX` (Å) | `2.5` | `--cluster-buffer` | `cluster_buffer` |
 
 The Python function has no defaults for `hole` and `rmax`. Pass them explicitly (the CLI, MCP, and SciLink defaults are `1` and `6.0`).
 
@@ -116,7 +117,6 @@ These are not options. Changing them requires editing `mlmd_exafs/feff.py` (`car
 
 | Behavior | Value |
 |---|---|
-| Cluster (carve) radius | `RMAX + 2.5` Å |
 | Hydrogen | Removed from the cluster |
 | Potentials | Absorber is potential 0; one potential per element in the cluster, numbered in order of atomic number |
 | Cards never written | `EXAFS`, `FMS`, `DEBYE`, `EDGE`, `S02`, `XANES`, `NLEG`, `CRITERIA` (FEFF defaults apply) |
@@ -178,7 +178,7 @@ Workflow default: `--rmax 6.0` Å. Change with `--rmax` / `rmax`. FEFF9 treats `
 
 - The number of paths grows roughly exponentially with `RMAX`, and the cost is paid once per snapshot. Start small, inspect the result, and increase gradually.
 - `RMAX` should cover at least the R range you will compare with experiment (the upper end of the Fourier-transform window in `convergence` or your own analysis).
-- The carved cluster is `RMAX + 2.5` Å, so a larger `RMAX` needs a larger MD cell.
+- The carved cluster is `RMAX + cluster_buffer` Å (default buffer 2.5 Å), so a larger `RMAX` needs a larger MD cell. In small cells, periodic images of the absorber can fall inside the cluster and FEFF stops with `Cannot find all representative atoms`; reduce `--cluster-buffer` (0 is allowed) so the cluster stays inside the nearest image.
 
 ## 8. `SCF` card parameters
 
@@ -194,6 +194,7 @@ The values are `rfms1 lfms1 nscmt ca nmix`: the cluster radius for the self-cons
 
 - Self-consistent potentials have a small effect on the EXAFS oscillations but give a more accurate E₀ and more reliable phase shifts. Keep `SCF` on.
 - The SCF radius should include at least the first one or two coordination shells.
+- `feff-input` stops with an error if `RMAX + cluster_buffer` is smaller than the SCF radius, because the SCF cluster would be incomplete.
 - For isolated molecules or clusters in vacuum, set `lfms1` to `1`.
 
 ## 9. `CORRECTIONS` card
@@ -211,9 +212,9 @@ Workflow default: omitted. Add with `--corrections "<vrcorr> <vicorr>"` / `corre
 
 For each sampled frame, `carve_out`:
 
-1. Builds a supercell with an odd number of repeats (at least 3) along each cell vector, large enough to hold a sphere of `RMAX + 2.5` Å.
+1. Builds a supercell with an odd number of repeats (at least 3) along each cell vector, large enough to hold a sphere of `RMAX + cluster_buffer` Å.
 2. Translates the absorber to the origin and wraps positions.
-3. Keeps every non-hydrogen atom within `RMAX + 2.5` Å of the absorber. H atoms are very weak scatterers, so their contribution to EXAFS is negligible. The 2.5 Å margin keeps paths shorter than `RMAX` away from the edge of the cluster.
+3. Keeps every non-hydrogen atom within `RMAX + cluster_buffer` Å of the absorber. H atoms are very weak scatterers, so their contribution to EXAFS is negligible. A path with half-length up to `RMAX` can only visit atoms within `RMAX` of the absorber, so paths do not need the buffer. FEFF builds each potential type from a representative atom close to the absorber, whose neighbors lie well inside `RMAX`. The buffer (default 2.5 Å, about one neighbor shell) is a safety margin; `--cluster-buffer 0` reproduces a cluster cut exactly at `RMAX`.
 4. Assigns potentials: 0 for the absorber, then one per element present. Atoms of the absorber's element other than the absorber get their own potential. The default FEFF array limits (`nphx`) are enough unless a snapshot contains an unusually large number of distinct elements (see `feff9-setup.md` §4.4).
 
 Notes:

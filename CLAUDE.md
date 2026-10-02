@@ -12,7 +12,7 @@ relax, then md, then feff-input, then run-feff (cleans up automatically), then a
 |------|------|
 | `mlmd_exafs/calculators.py` | `build_calculator(backend, device, model, head, modal, checkpoint)`, `BACKENDS` tuple. Backend imports are lazy (chgnet, mace, uma, orb, sevennet). |
 | `mlmd_exafs/md.py` | `relax`, `md_engine`, `run_md`. `run_md` writes `<save_dir>/<stem>/<stem>.traj` (via `<stem>.partial.traj`, renamed on completion) and skips the run if that file already exists. |
-| `mlmd_exafs/feff.py` | `carve_out`, `generate_feff_inputs_from_trajectory`. Writes `exafs_<El>_hole<h>_de_<vrcorr>_s02_<x.x>_rc_<rmax>/<frame:06>_<atom>/feff.inp`. The carve radius is rmax + 2.5 Å. |
+| `mlmd_exafs/feff.py` | `carve_out`, `generate_feff_inputs_from_trajectory`. Writes `exafs_<El>_hole<h>_de_<vrcorr>_s02_<x.x>_rc_<rmax>/<frame:06>_<atom>/feff.inp`. The carve radius is rmax + cluster_buffer (default 2.5 Å, must be ≥ the SCF radius). |
 | `mlmd_exafs/run_feff.py` | `run_feff_batch`, `DEFAULT_FEFF_BIN=/share/feff/feff90_binaries/feff.x` |
 | `mlmd_exafs/cleanup_exafs.py` | `cleanup_exafs`. Keeps feff.inp, feff.out, and chi.dat. |
 | `mlmd_exafs/analysis.py` | `average_chi` (writes `<savefile>-chi_avg.dat`), `xftf`, `plot_chi`, `plot_convergence` |

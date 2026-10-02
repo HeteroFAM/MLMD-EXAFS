@@ -153,6 +153,7 @@ def _cmd_feff_input(args):
         corrections=args.corrections,
         step_size=args.step_size,
         sampling_start=args.sampling_start,
+        cluster_buffer=args.cluster_buffer,
     )
     print(json.dumps(result, indent=2))
 
@@ -292,6 +293,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--step-size", type=int, default=250, help="Sample every N-th frame.")
     p.add_argument("--sampling-start", type=int, default=0, help="First frame to sample.")
+    p.add_argument(
+        "--cluster-buffer",
+        type=float,
+        default=2.5,
+        help="Carve radius beyond --rmax (A). rmax + buffer must be >= the SCF radius.",
+    )
     p.set_defaults(func=_cmd_feff_input)
 
     # run-feff

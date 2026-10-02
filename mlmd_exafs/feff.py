@@ -59,8 +59,9 @@ def carve_out(atoms, target_atom: int, rmax: float = 8.5) -> tuple[str, str, Any
     target_atom : int
         Index of the absorbing atom.
     rmax : float
-        Cluster radius in Angstroms (default 8.5). Should exceed the FEFF RMAX
-        card by ~2.5 A so no scattering paths are truncated.
+        Cluster radius in Angstroms (default 8.5). Must be at least the FEFF
+        RMAX card (paths only visit atoms within RMAX) and the SCF radius
+        (``rfms1``) so the self-consistent cluster is fully populated.
 
     Returns
     -------
@@ -188,6 +189,7 @@ def generate_feff_inputs_from_trajectory(
     corrections: str | None = None,
     step_size: int = 250,
     sampling_start: int = 0,
+    cluster_buffer: float = 2.5,
 ) -> dict[str, Any]:
     """Write batch FEFF inputs from an MD trajectory.
 
@@ -204,7 +206,8 @@ def generate_feff_inputs_from_trajectory(
     hole : int
         HOLE card index: 1=K, 2=L1, 3=L2, 4=L3.
     rmax : float
-        FEFF RMAX path cutoff in Angstroms. The carve radius is rmax + 2.5 A.
+        FEFF RMAX path cutoff in Angstroms. The carve radius is
+        ``rmax + cluster_buffer``.
     scf : str
         SCF card parameters, e.g. ``"6.0 0 30 0.2 1"``.
     s02 : float
@@ -217,12 +220,28 @@ def generate_feff_inputs_from_trajectory(
         Sample every N-th frame.
     sampling_start : int
         First frame index to sample (use to skip equilibration).
+    cluster_buffer : float
+        Extra carve radius beyond ``rmax`` in Angstroms (default 2.5, >= 0).
+        Use 0 when periodic images of the absorber would otherwise enter the
+        cluster (small cells, large ``rmax``). The carve radius must be at
+        least the SCF radius (first value of ``scf``).
 
     Returns
     -------
     dict
         ``output_dir``, ``n_inputs``, ``frames``.
     """
+    if cluster_buffer < 0:
+        raise ValueError(f"cluster_buffer must be >= 0, got {cluster_buffer}.")
+    cluster_rmax = rmax + cluster_buffer
+    scf_radius = float(scf.split()[0])
+    if cluster_rmax < scf_radius:
+        raise ValueError(
+            f"Carve radius rmax + cluster_buffer = {cluster_rmax} A is smaller "
+            f"than the SCF radius {scf_radius} A, so the SCF cluster would be "
+            "incomplete. Increase rmax or cluster_buffer, or reduce the SCF radius."
+        )
+
     traj_path = Path(trajectory_path)
     trajectory = read(str(traj_path), ":")
     run_name = traj_path.stem
@@ -242,7 +261,6 @@ def generate_feff_inputs_from_trajectory(
 
     n_frames = len(trajectory)
     frames = list(range(sampling_start, n_frames, step_size))
-    cluster_rmax = rmax + 2.5
 
     carved_regions = []
     for frame in frames:

@@ -121,11 +121,12 @@ mlmd-exafs feff-input \
 
 | Option | Default | Guidance |
 |--------|---------|----------|
-| `--rmax` | 6.0 Å | 4.5 Å first shell only; 6.0 Å for 2–4 shells; 8.0 Å for extended multiple scattering. The carve radius is automatically `rmax + 2.5 Å`. |
+| `--rmax` | 6.0 Å | 4.5 Å first shell only; 6.0 Å for 2–4 shells; 8.0 Å for extended multiple scattering. The carve radius is `rmax + --cluster-buffer` (default 2.5 Å). |
 | `--scf` | `6.0 0 30 0.2 1` | Standard metals/oxides. Use `5.5 0 30 0.05 10` for f-electron systems. |
 | `--s02` | 1.0 | S0² amplitude reduction; refine against experiment (0.8–1.0). |
 | `--corrections` | omitted | Fermi-level shift `"vrcorr vicorr"`, e.g. `"3.0 0.0"`. Omit for a first pass, fit later. |
 | `--control` | `1 1 1 1 1 1` | Full calculation. `1 1 0 1 1 1` skips the XANES path module (EXAFS only). |
+| `--cluster-buffer` | 2.5 Å | Carve radius beyond `--rmax`. Lower it (0 allowed) if periodic images of the absorber enter the cluster in a small cell. `rmax + buffer` must be ≥ the SCF radius. |
 
 Inputs land in a directory named after the parameters, e.g.
 `md_out/relaxed/exafs_Zn_hole1_de_0.0_s02_1.0_rc_6.0/`, with one

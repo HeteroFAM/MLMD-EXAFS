@@ -332,6 +332,11 @@ Outputs in `lcf_fit/`:
 - `best_lcf_fit.png` — experiment vs. best LCF (k²χ).
 - `best_lcf_fit_R.png` — the same comparison in R-space (|χ(R)| of the
   k²-weighted χ(k), Hanning window over the fitted k range).
+- `top_fits.csv` — rank-1 fit summary (rfactor, redchi, ΔE0, weight ± error
+  per standard; `none` = in the library but unused).
+- `top_<n_top>_candidates.csv` — the `n_top` best fits, one row each, one column per
+  standard. To compare several runs side by side, use
+  `python -m mlmd_exafs.lcf_summary dir1 dir2 ... -o summaries/`.
 - `fit.log` — the progress output printed to the terminal, followed by the
   returned result as JSON (written even with `verbose=False`).
 

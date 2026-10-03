@@ -75,6 +75,7 @@ from typing import Any, Iterable
 import numpy as np
 
 from .fitting_E0 import read_experimental
+from .lcf_summary import write_top_candidates, write_top_fits
 
 # k^2 = 0.262468426 * E, with k in Angstrom^-1 and E in eV
 K2_PER_EV = 0.262468426
@@ -735,8 +736,10 @@ def run_lcf(
 
     Writes ``lcf_results.csv`` (all fits, ranked), ``delta_e0.csv``,
     ``best_lcf_fit.dat``, ``best_lcf_fit.png`` (k^2 chi(k)),
-    ``best_lcf_fit_R.png`` (|chi(R)|) and ``fit.log`` (the progress output
-    plus the returned dict as JSON) into ``outdir``.
+    ``best_lcf_fit_R.png`` (|chi(R)|), ``top_fits.csv`` (best fit summary),
+    ``top_<n_top>_candidates.csv`` (the ``n_top`` best fits, one row each) and
+    ``fit.log`` (the progress output plus the returned dict as JSON) into
+    ``outdir``.
 
     Returns
     -------
@@ -933,6 +936,10 @@ def run_lcf(
     plot_r_path = out / "best_lcf_fit_R.png"
     _plot_best_fit(kv, chi_exp[valid], fit_chi[valid], plot_path, plot_r_path)
 
+    top_fits_path = write_top_fits([out], out / "top_fits.csv")
+    top_candidates_path = write_top_candidates(
+        [out], out / f"top_{n_top}_candidates.csv", n=n_top)
+
     log_path = out / "fit.log"
     log()
     log(f"Ran {len(ranked)} LCF fits.")
@@ -940,7 +947,8 @@ def run_lcf(
     for s, w, e, e1 in zip(best["standards"], best["weights"],
                            best["delta_e0_eV"], best["delta_e0_initial_eV"]):
         log(f"  {w:8.4f}  {s}  (deltaE0 = {e:.4f} eV, step 1: {e1:.4f} eV)")
-    for path in (results_path, delta_e0_path, best_path, plot_path, plot_r_path, log_path):
+    for path in (results_path, delta_e0_path, best_path, plot_path, plot_r_path,
+                 top_fits_path, top_candidates_path, log_path):
         log(f"Wrote: {path}")
 
     result = {
@@ -956,6 +964,8 @@ def run_lcf(
         "best_fit_file": str(best_path),
         "plot_file": str(plot_path),
         "plot_r_file": str(plot_r_path),
+        "top_fits_file": top_fits_path,
+        "top_candidates_file": top_candidates_path,
         "log_file": str(log_path),
     }
     with open(log_path, "w") as f:

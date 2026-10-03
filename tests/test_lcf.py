@@ -83,7 +83,7 @@ def test_run_lcf_recovers_mixture(tmp_path, standards):
     assert best["delta_e0_eV"] == pytest.approx([1.5, -1.0], abs=0.2)
     assert result["n_fits"] == 3
     for f in ("lcf_results.csv", "delta_e0.csv", "best_lcf_fit.dat", "best_lcf_fit.png",
-              "best_lcf_fit_R.png", "fit.log"):
+              "best_lcf_fit_R.png", "fit.log", "top_fits.csv", "top_10_candidates.csv"):
         assert (tmp_path / "lcf" / f).is_file()
     log = (tmp_path / "lcf" / "fit.log").read_text()
     assert "Ran 3 LCF fits." in log and '"n_fits": 3' in log
@@ -326,3 +326,15 @@ def test_best_fit_curve_uses_refined_delta_e0(tmp_path, standards):
         for p, w, e in zip(standards, best["weights"], best["delta_e0_eV"])
     )
     np.testing.assert_allclose(fitted, expected, atol=1e-9)
+
+
+def test_lcf_summary_tables(tmp_path, standards):
+    exp = _mix_exp(tmp_path, standards, (0.6, 0.4))
+    run_lcf(str(exp), [str(p) for p in standards], outdir=str(tmp_path / "lcf"),
+            max_components=2, verbose=False)
+    lines = (tmp_path / "lcf" / "top_fits.csv").read_text().splitlines()
+    assert lines[0] == ",lcf"
+    assert any(l.startswith("a,") for l in lines)
+    cand = (tmp_path / "lcf" / "top_10_candidates.csv").read_text().splitlines()
+    assert cand[0].startswith("model,rank,n_components,rfactor,redchi,deltaE0,a,b")
+    assert len(cand) == 1 + 3

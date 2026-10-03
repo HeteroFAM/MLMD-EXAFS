@@ -17,7 +17,8 @@ relax, then md, then feff-input, then run-feff (cleans up automatically), then a
 | `mlmd_exafs/cleanup_exafs.py` | `cleanup_exafs`. Keeps feff.inp, feff.out, and chi.dat. |
 | `mlmd_exafs/analysis.py` | `average_chi` (writes `<savefile>-chi_avg.dat`), `xftf`, `plot_chi`, `plot_convergence` |
 | `mlmd_exafs/fitting_E0.py` | `fit_e0`. Reads experimental files in `.dat` or `.csv` format. Also has a legacy argparse `main`. |
-| `mlmd_exafs/lcf.py` | `run_lcf` |
+| `mlmd_exafs/lcf.py` | `run_lcf`. Also writes `top_fits.csv` and `top_<n_top>_candidates.csv` via `lcf_summary`. |
+| `mlmd_exafs/lcf_summary.py` | `write_top_fits`, `write_top_candidates`. Called by `run_lcf`; also runnable as `python -m mlmd_exafs.lcf_summary dir1 dir2 ... -o out/` to compare several LCF runs. |
 | `mlmd_exafs/cli.py` | `mlmd-exafs` entry point. Uses `_cmd_*` handlers, `build_parser`, and the shared `_add_backend_args` / `_add_e0_fit_args` helpers. |
 | `mlmd_exafs/mcp_server.py` | `mlmd-exafs-mcp` entry point. Exposes 10 `mlmd_*` tools and supports both the mcp 1.x FastMCP and 2.x MCPServer APIs. |
 | `tool/mlmd_exafs_tool.py` | SciLink plug-in: wrapper functions, a `tool_schemas` list (JSON schemas), and a `create_tool_functions(data_path, output_dir)` factory |

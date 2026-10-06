@@ -120,7 +120,12 @@ def _cmd_relax(args):
     from .md import relax
 
     calc = _make_calculator(args)
-    result = relax(args.input, args.output, calc, fmax=args.fmax, steps=args.steps)
+    result = relax(
+        args.input, args.output, calc, fmax=args.fmax, steps=args.steps,
+        keep_symmetry=not args.no_symmetry,
+        target_pressure_GPa=args.pressure,
+        max_volume_change=args.max_volume_change,
+    )
     print(json.dumps(result, indent=2))
 
 
@@ -262,8 +267,20 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("relax", help="MLIP cell + position relaxation.")
     p.add_argument("-i", "--input", required=True, help="Input structure file.")
     p.add_argument("-o", "--output", required=True, help="Output relaxed structure.")
-    p.add_argument("--fmax", type=float, default=0.05, help="Force threshold (eV/A).")
+    p.add_argument("--fmax", type=float, default=0.02, help="Force threshold (eV/A).")
     p.add_argument("--steps", type=int, default=10000, help="Max optimizer steps.")
+    p.add_argument(
+        "--no-symmetry", action="store_true",
+        help="Do not constrain the relaxation to the starting crystal symmetry.",
+    )
+    p.add_argument(
+        "--pressure", type=float, default=0.0,
+        help="Target external pressure (GPa).",
+    )
+    p.add_argument(
+        "--max-volume-change", type=float, default=0.25,
+        help="Warn if relative volume change exceeds this (0.25 = 25%%).",
+    )
     _add_backend_args(p)
     p.set_defaults(func=_cmd_relax)
 

@@ -61,7 +61,11 @@ def mlmd_relax(
     head: str = "omat",
     modal: str = "mpa",
     checkpoint: Optional[str] = None,
-    fmax: float = 0.05,
+    fmax: float = 0.02,
+    steps: int = 10000,
+    keep_symmetry: bool = True,
+    target_pressure_GPa: float = 0.0,
+    max_volume_change: float = 0.25,
 ) -> dict:
     """Relax a structure's atomic positions and cell with an MLIP.
 
@@ -79,6 +83,11 @@ def mlmd_relax(
         checkpoint: Path to a local (e.g. fine-tuned) model checkpoint file,
             used instead of the pretrained model. Do not also pass model.
         fmax: Force convergence threshold in eV/A.
+        steps: Maximum optimizer steps.
+        keep_symmetry: Constrain relaxation to the starting crystal symmetry.
+        target_pressure_GPa: Target external pressure in GPa.
+        max_volume_change: Warn if relative volume change exceeds this
+            (0.25 = 25%); see volume_warning in the result.
     """
     calc = build_calculator(
         backend,
@@ -88,7 +97,12 @@ def mlmd_relax(
         modal=modal,
         checkpoint=checkpoint,
     )
-    result = relax(structure_path, output, calc, fmax=fmax)
+    result = relax(
+        structure_path, output, calc, fmax=fmax, steps=steps,
+        keep_symmetry=keep_symmetry,
+        target_pressure_GPa=target_pressure_GPa,
+        max_volume_change=max_volume_change,
+    )
     result["status"] = "success"
     return result
 

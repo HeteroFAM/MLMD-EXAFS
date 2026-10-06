@@ -38,11 +38,17 @@ mlmd-exafs relax \
     -o relaxed.xyz \
     --backend chgnet \
     --device cpu \
-    --fmax 0.05
+    --fmax 0.02
 ```
 
-- `--fmax` — force convergence threshold in eV/Å (0.05 is a good default; use
-  0.02 for tighter geometries).
+- `--fmax` — force convergence threshold in eV/Å (default 0.02; loosen to 0.05
+  for a faster, rougher relaxation).
+- `--no-symmetry` — do not constrain the relaxation to the starting crystal
+  symmetry (symmetry is kept by default).
+- `--pressure <GPa>` — target external pressure (default 0).
+- `--max-volume-change <frac>` — warn if the cell volume changes by more than
+  this fraction (default 0.25); check the starting structure if it fires.
+  The result JSON reports `volume_change` and `volume_warning`.
 - `--device cuda` — use the GPU if available.
 - `--checkpoint <path>` — load a local (e.g. fine-tuned) model file instead of
   the backend's pretrained model. Use the same `--checkpoint` in Step 2. See
@@ -381,7 +387,7 @@ from mlmd_exafs.lcf import run_lcf
 
 calc = build_calculator("chgnet", device="cpu")
 
-relax("zn_hematite.cif", "relaxed.xyz", calc, fmax=0.05)
+relax("zn_hematite.cif", "relaxed.xyz", calc, fmax=0.02)
 
 md = run_md("relaxed.xyz", calc, "md_out", temperature=300, n_steps=11000)
 

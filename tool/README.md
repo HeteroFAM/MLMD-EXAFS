@@ -60,7 +60,7 @@ string (not a loaded array).
 
 | Tool | Stage | Key arguments |
 |------|-------|---------------|
-| `mlmd_relax` | Cell + position relaxation | `backend`, `checkpoint`, `fmax` |
+| `mlmd_relax` | Cell + position relaxation | `backend`, `checkpoint`, `fmax`, `steps`, `keep_symmetry`, `target_pressure_GPa`, `max_volume_change` |
 | `mlmd_md` | NVT molecular dynamics | `backend`, `checkpoint`, `temperature`, `n_steps`, `step_size` |
 | `mlmd_feff_input` | Carve snapshots → `feff.inp` | `trajectory_path`, `target_atom`, `hole`, `rmax` |
 | `mlmd_run_feff` | Batch FEFF execution + scratch cleanup | `directory`, `feff_bin`, `max_workers`, `cleanup` |

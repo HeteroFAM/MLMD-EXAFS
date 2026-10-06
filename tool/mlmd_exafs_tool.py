@@ -65,7 +65,11 @@ def mlmd_relax(
     head: str = "omat",
     modal: str = "mpa",
     checkpoint: str | None = None,
-    fmax: float = 0.05,
+    fmax: float = 0.02,
+    steps: int = 10000,
+    keep_symmetry: bool = True,
+    target_pressure_GPa: float = 0.0,
+    max_volume_change: float = 0.25,
 ) -> dict:
     """Relax cell + positions with an MLIP; write relaxed.xyz to output_dir."""
     src = _resolve(structure_path, data_path)
@@ -74,7 +78,12 @@ def mlmd_relax(
         backend, device=device, model=model, head=head, modal=modal,
         checkpoint=checkpoint,
     )
-    result = relax(src, out, calc, fmax=fmax)
+    result = relax(
+        src, out, calc, fmax=fmax, steps=steps,
+        keep_symmetry=keep_symmetry,
+        target_pressure_GPa=target_pressure_GPa,
+        max_volume_change=max_volume_change,
+    )
     result["status"] = "success"
     result["next_step"] = (
         f"Run mlmd_md with structure_path='{out}' to sample a trajectory."
@@ -346,7 +355,11 @@ tool_schemas = [
                         "type": "string",
                         "description": "Path to a local (e.g. fine-tuned) model checkpoint; replaces model.",
                     },
-                    "fmax": {"type": "number", "description": "Force threshold eV/A (default 0.05)."},
+                    "fmax": {"type": "number", "description": "Force threshold eV/A (default 0.02)."},
+                    "steps": {"type": "integer", "description": "Maximum optimizer steps (default 10000)."},
+                    "keep_symmetry": {"type": "boolean", "description": "Constrain relaxation to the starting crystal symmetry (default true)."},
+                    "target_pressure_GPa": {"type": "number", "description": "Target external pressure in GPa (default 0)."},
+                    "max_volume_change": {"type": "number", "description": "Warn if relative volume change exceeds this (default 0.25)."},
                 },
                 "required": ["backend"],
             },
@@ -619,10 +632,15 @@ def create_tool_functions(data_path: str, output_dir: str) -> dict:
     """
     return {
         "mlmd_relax": lambda backend, structure_path=None, device="cpu", model=None,
-        head="omat", modal="mpa", checkpoint=None, fmax=0.05: mlmd_relax(
+        head="omat", modal="mpa", checkpoint=None, fmax=0.02,
+        steps=10000, keep_symmetry=True, target_pressure_GPa=0.0,
+        max_volume_change=0.25: mlmd_relax(
             data_path, output_dir, backend, structure_path=structure_path,
             device=device, model=model, head=head, modal=modal,
-            checkpoint=checkpoint, fmax=fmax,
+            checkpoint=checkpoint, fmax=fmax, steps=steps,
+            keep_symmetry=keep_symmetry,
+            target_pressure_GPa=target_pressure_GPa,
+            max_volume_change=max_volume_change,
         ),
         "mlmd_md": lambda backend, structure_path=None, device="cpu", model=None,
         head="omat", modal="mpa", checkpoint=None, temperature=300.0,

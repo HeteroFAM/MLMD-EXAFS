@@ -9,9 +9,12 @@ with a Frechet cell filter so the equilibrium lattice falls out of the run.
 from __future__ import annotations
 
 import time
+import warnings
 from pathlib import Path
 
+import numpy as np
 from ase import units
+from ase.constraints import FixSymmetry
 from ase.filters import FrechetCellFilter
 from ase.io import Trajectory, read, write
 from ase.md.nose_hoover_chain import NoseHooverChainNVT
@@ -28,8 +31,11 @@ def relax(
     input_structure: str,
     output_structure: str,
     calculator,
-    fmax: float = 0.05,
+    fmax: float = 0.02,
     steps: int = 10000,
+    keep_symmetry: bool = True,
+    target_pressure_GPa: float = 0.0,
+    max_volume_change: float = 0.25,
 ) -> dict:
     """Relax atomic positions and the cell with the given MLIP calculator.
 
@@ -45,24 +51,59 @@ def relax(
         Force convergence threshold in eV/A.
     steps : int
         Maximum optimizer steps.
+    keep_symmetry : bool
+        Constrain the relaxation to preserve the starting crystal symmetry
+        (ASE ``FixSymmetry``).
+    target_pressure_GPa : float
+        Target external hydrostatic pressure in GPa.
+    max_volume_change : float
+        Relative volume change above which a warning is issued (0.25 = 25%).
 
     Returns
     -------
     dict
-        Convergence flag, step count, final energy, and cell parameters.
+        Convergence flag, step count, final energy, cell parameters, relative
+        volume change, and a ``volume_warning`` flag.
     """
     atoms = read(input_structure)
     atoms.calc = calculator
 
+    # Fail early if the model doesn't provide stress
+    try:
+        s = atoms.get_stress()
+    except Exception as e:
+        raise RuntimeError(
+            "Calculator cannot provide stress; cell relaxation is not possible."
+        ) from e
+    if not np.all(np.isfinite(s)):
+        raise RuntimeError("Non-finite stress from calculator.")
+
+    v0 = atoms.get_volume()
+
+    if keep_symmetry:
+        atoms.set_constraint(FixSymmetry(atoms))
+
     cell0 = atoms.cell.cellpar()
-    ecf = FrechetCellFilter(atoms)
+    ecf = FrechetCellFilter(atoms, scalar_pressure=target_pressure_GPa * units.GPa)
     opt = FIRE(ecf)
     converged = opt.run(fmax=fmax, steps=steps)
     cell1 = atoms.cell.cellpar()
 
+    # Drop the constraint so the output (and MD downstream) is unconstrained.
+    atoms.set_constraint()
+
     out_path = Path(output_structure)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     write(str(out_path), atoms)
+
+    dv = atoms.get_volume() / v0 - 1
+    volume_warning = abs(dv) > max_volume_change
+    if volume_warning:
+        warnings.warn(
+            f"Volume changed by {dv:+.1%}; check the starting structure and "
+            "whether the model is valid for it.",
+            stacklevel=2,
+        )
 
     return {
         "converged": bool(converged),
@@ -70,6 +111,8 @@ def relax(
         "final_energy_eV": float(atoms.get_potential_energy()),
         "initial_cellpar": [float(x) for x in cell0],
         "final_cellpar": [float(x) for x in cell1],
+        "volume_change": float(dv),
+        "volume_warning": bool(volume_warning),
         "output": str(out_path),
     }
 
